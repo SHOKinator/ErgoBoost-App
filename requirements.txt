@@ -1,0 +1,19 @@
+# ErgoBoost Requirements
+# Core
+PySide6>=6.5
+opencv-python>=4.8
+mediapipe==0.10.10
+numpy>=1.24
+PyYAML>=6.0
+matplotlib>=3.7
+psutil>=5.9
+
+# Windows notifications (Windows only)
+winotify>=1.1.0; sys_platform == 'win32'
+
+# Optional: PySpark analytics (for Big Data diploma)
+# pyspark>=3.5
+# Install sqlite-jdbc jar separately into libs/ folder
+
+# Optional: sound alerts
+# playsound>=1.3

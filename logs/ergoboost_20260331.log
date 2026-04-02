@@ -1,0 +1,81 @@
+2026-03-31 15:34:20 - gui.main_window - INFO - ErgoBoost GUI initialized
+2026-03-31 15:34:24 - gui.monitoring_worker - INFO - Initializing monitoring worker...
+2026-03-31 15:34:25 - services.baseline_calibrator - INFO - Baseline calibration started
+2026-03-31 15:34:25 - services.session_manager - INFO - Started session 1
+2026-03-31 15:34:25 - gui.monitoring_worker - INFO - Monitoring worker initialized
+2026-03-31 15:34:27 - services.alert_manager - WARNING - Distance alert: Too too far
+2026-03-31 15:34:30 - services.baseline_calibrator - INFO - Baseline calibrated: {'forward_shift': -0.5148030749589652, 'distance_ratio': 0.1748850711389043, 'lateral_tilt': -2.999978529506771}
+2026-03-31 15:35:05 - services.alert_manager - WARNING - Distance alert: Too too far
+2026-03-31 15:35:24 - gui.monitoring_worker - INFO - Cleaning up monitoring worker...
+2026-03-31 15:35:24 - services.session_manager - INFO - Ended session 1
+2026-03-31 15:35:25 - gui.monitoring_worker - INFO - Monitoring worker cleaned up
+2026-03-31 15:36:11 - gui.monitoring_worker - INFO - Initializing monitoring worker...
+2026-03-31 15:36:11 - services.baseline_calibrator - INFO - Baseline calibration started
+2026-03-31 15:36:11 - services.session_manager - INFO - Started session 2
+2026-03-31 15:36:11 - gui.monitoring_worker - INFO - Monitoring worker initialized
+2026-03-31 15:36:12 - services.alert_manager - WARNING - Distance alert: Too too far
+2026-03-31 15:36:16 - services.baseline_calibrator - INFO - Baseline calibrated: {'forward_shift': -0.5237857417609324, 'distance_ratio': 0.18045203716655822, 'lateral_tilt': -3.9352940915210297}
+2026-03-31 15:36:42 - services.alert_manager - WARNING - Distance alert: Too too far
+2026-03-31 15:36:43 - gui.monitoring_worker - INFO - Settings updated in monitoring worker
+2026-03-31 15:37:07 - gui.monitoring_worker - INFO - Settings updated in monitoring worker
+2026-03-31 15:37:12 - services.alert_manager - WARNING - Distance alert: Too too far
+2026-03-31 15:37:42 - services.alert_manager - WARNING - Distance alert: Too too far
+2026-03-31 15:38:08 - services.alert_manager - WARNING - Fatigue alert: LOW_BLINK, rate=4.7
+2026-03-31 15:38:12 - services.alert_manager - WARNING - Distance alert: Too too far
+2026-03-31 15:38:44 - gui.monitoring_worker - INFO - Cleaning up monitoring worker...
+2026-03-31 15:38:44 - services.session_manager - INFO - Ended session 2
+2026-03-31 15:38:44 - gui.monitoring_worker - INFO - Monitoring worker cleaned up
+2026-03-31 15:39:42 - gui.main_window - INFO - ErgoBoost GUI initialized
+2026-03-31 15:39:44 - gui.monitoring_worker - INFO - Initializing monitoring worker...
+2026-03-31 15:39:44 - services.baseline_calibrator - INFO - Baseline calibration started
+2026-03-31 15:39:44 - services.session_manager - INFO - Started session 3
+2026-03-31 15:39:44 - gui.monitoring_worker - INFO - Monitoring worker initialized
+2026-03-31 15:39:46 - services.alert_manager - WARNING - Distance alert: Too too far
+2026-03-31 15:39:49 - services.baseline_calibrator - INFO - Baseline calibrated: {'forward_shift': -0.7159707192318737, 'lateral_tilt': -22.838246184163033, 'distance_ratio': 0.17899823378156396}
+2026-03-31 15:40:13 - gui.monitoring_worker - INFO - Settings updated in monitoring worker
+2026-03-31 15:40:16 - services.alert_manager - WARNING - Distance alert: Too too far
+2026-03-31 15:40:56 - services.alert_manager - WARNING - Distance alert: Too too far
+2026-03-31 15:41:12 - gui.monitoring_worker - INFO - Cleaning up monitoring worker...
+2026-03-31 15:41:12 - services.session_manager - INFO - Ended session 3
+2026-03-31 15:41:12 - gui.monitoring_worker - INFO - Monitoring worker cleaned up
+2026-03-31 15:41:13 - gui.monitoring_worker - INFO - Initializing monitoring worker...
+2026-03-31 15:41:13 - services.baseline_calibrator - INFO - Baseline calibration started
+2026-03-31 15:41:13 - services.session_manager - INFO - Started session 4
+2026-03-31 15:41:13 - gui.monitoring_worker - INFO - Monitoring worker initialized
+2026-03-31 15:41:13 - services.alert_manager - WARNING - Distance alert: Too too far
+2026-03-31 15:41:18 - services.baseline_calibrator - INFO - Baseline calibrated: {'forward_shift': -0.5070423535883877, 'lateral_tilt': -2.282976133716751, 'distance_ratio': 0.1679987652696474}
+2026-03-31 15:41:43 - services.alert_manager - WARNING - Distance alert: Too too far
+2026-03-31 15:42:13 - services.alert_manager - WARNING - Distance alert: Too too far
+2026-03-31 15:42:43 - gui.monitoring_worker - INFO - Cleaning up monitoring worker...
+2026-03-31 15:42:43 - services.session_manager - INFO - Ended session 4
+2026-03-31 15:42:44 - gui.monitoring_worker - INFO - Monitoring worker cleaned up
+2026-03-31 16:01:17 - gui.main_window - INFO - ErgoBoost GUI initialized
+2026-03-31 16:01:31 - gui.monitoring_worker - INFO - Initializing monitoring worker...
+2026-03-31 16:01:31 - services.baseline_calibrator - INFO - Baseline calibration started
+2026-03-31 16:01:31 - services.session_manager - INFO - Started session 5
+2026-03-31 16:01:31 - gui.monitoring_worker - INFO - Monitoring worker initialized
+2026-03-31 16:01:36 - services.baseline_calibrator - INFO - Baseline calibrated: {'forward_shift': -0.5094744139873915, 'distance_ratio': 0.18869760293355223, 'lateral_tilt': -1.7939083932741942}
+2026-03-31 16:01:36 - gui.monitoring_worker - INFO - Calibration completed
+2026-03-31 16:01:36 - gui.monitoring_worker - INFO - Distance baseline set: 0.1887
+2026-03-31 16:01:56 - services.alert_manager - WARNING - Distance alert: Too too far
+2026-03-31 16:02:26 - services.alert_manager - WARNING - Distance alert: Too too close
+2026-03-31 16:02:56 - services.alert_manager - WARNING - Distance alert: Too too close
+2026-03-31 16:04:13 - services.alert_manager - WARNING - Distance alert: Too too far
+2026-03-31 16:04:26 - services.break_reminder - INFO - User returned after 12s (short absence, not a break)
+2026-03-31 16:04:26 - services.break_reminder - INFO - User returned after 0s (short absence, not a break)
+2026-03-31 16:04:55 - gui.monitoring_worker - INFO - Cleaning up monitoring worker...
+2026-03-31 16:04:55 - services.session_manager - INFO - Ended session 5
+2026-03-31 16:04:55 - gui.monitoring_worker - INFO - Monitoring worker cleaned up
+2026-03-31 16:06:42 - gui.monitoring_worker - INFO - Initializing monitoring worker...
+2026-03-31 16:06:42 - services.baseline_calibrator - INFO - Baseline calibration started
+2026-03-31 16:06:42 - services.session_manager - INFO - Started session 6
+2026-03-31 16:06:42 - gui.monitoring_worker - INFO - Monitoring worker initialized
+2026-03-31 16:06:47 - services.baseline_calibrator - INFO - Baseline calibrated: {'forward_shift': -0.5450979427722213, 'distance_ratio': 0.18200711413089163, 'lateral_tilt': -1.1978440777208545}
+2026-03-31 16:06:47 - gui.monitoring_worker - INFO - Calibration completed
+2026-03-31 16:06:47 - gui.monitoring_worker - INFO - Distance baseline set: 0.1820
+2026-03-31 16:06:54 - services.alert_manager - WARNING - Distance alert: Too too close
+2026-03-31 16:07:24 - services.alert_manager - WARNING - Distance alert: Too too close
+2026-03-31 16:07:33 - gui.monitoring_worker - INFO - Settings updated in monitoring worker
+2026-03-31 16:07:45 - gui.monitoring_worker - INFO - Cleaning up monitoring worker...
+2026-03-31 16:07:45 - services.session_manager - INFO - Ended session 6
+2026-03-31 16:07:45 - gui.monitoring_worker - INFO - Monitoring worker cleaned up
