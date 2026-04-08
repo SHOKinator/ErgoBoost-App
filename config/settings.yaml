@@ -9,6 +9,7 @@ break_work_duration: 5400
 calibration_duration: 5.0
 calibration_mode: always
 db_path: data/ergoboost.db
+detection_mode: rule_based
 distance_too_close: 0.3
 distance_too_far: 0.18
 enable_spark_analytics: true
@@ -22,7 +23,7 @@ log_interval: 5.0
 min_calibration_samples: 30
 posture_control_enabled: true
 posture_sensitivity: medium
-reaction_mode: alert_only
+reaction_mode: blur_os_screen
 show_face_landmarks: true
 show_pose_landmarks: true
 sound_alerts_enabled: false

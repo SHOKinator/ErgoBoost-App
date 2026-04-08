@@ -141,6 +141,10 @@ class DashboardTab(QWidget):
         grid.addWidget(QLabel("Severity"), 3, 0)
         grid.addWidget(self.severity_label, 3, 1)
 
+        self.method_label = self._make_value_label("rules", "#5a5a6a")
+        grid.addWidget(QLabel("Method"), 4, 0)
+        grid.addWidget(self.method_label, 4, 1)
+
         layout.addLayout(grid)
 
         self._add_divider(layout)
@@ -350,6 +354,16 @@ class DashboardTab(QWidget):
         sev_color = '#5a9a6a' if sev < 1 else '#b08030' if sev < 2 else '#c04050'
         self.severity_label.setText(f"{sev:.1f}")
         self.severity_label.setStyleSheet(f"color: {sev_color}; font-size: 12px; font-weight: 500;")
+
+        # Detection method
+        method = metrics.get('detection_method', 'rules')
+        conf = metrics.get('confidence', 0)
+        if method == 'ml' and conf > 0:
+            self.method_label.setText(f"ML ({conf:.0%})")
+            self.method_label.setStyleSheet("color: #6c8cff; font-size: 12px; font-weight: 500;")
+        else:
+            self.method_label.setText("Rules")
+            self.method_label.setStyleSheet("color: #5a5a6a; font-size: 12px; font-weight: 500;")
 
         # Distance
         ds = metrics.get('distance_status', 'Unknown')

@@ -16,9 +16,10 @@ from gui.session_detail_dialog import SessionDetailDialog
 
 
 class SessionsTab(QWidget):
-    def __init__(self, settings):
+    def __init__(self, settings, user_id: int = 0):
         super().__init__()
         self.settings = settings
+        self.user_id = user_id
         self.db = SQLiteRepository()
         self._init_ui()
         self.refresh_sessions()
@@ -65,7 +66,7 @@ class SessionsTab(QWidget):
         layout.addWidget(self.sessions_table)
 
     def refresh_sessions(self):
-        sessions = self.db.get_all_sessions(limit=100)
+        sessions = self.db.get_all_sessions(limit=100, user_id=self.user_id)
         self.sessions_table.setRowCount(len(sessions))
 
         for row, session in enumerate(sessions):

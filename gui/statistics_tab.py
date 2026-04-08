@@ -45,15 +45,16 @@ class StatsWorker(QThread):
     finished = Signal(dict)
     error = Signal(str)
 
-    def __init__(self, db_path, days):
+    def __init__(self, db_path, days, user_id=0):
         super().__init__()
         self.db_path = Path(db_path)
         self.days = days
+        self.user_id = user_id
 
     def run(self):
         try:
             db = SQLiteRepository(self.db_path)
-            sessions = db.get_historical_data(days=self.days)
+            sessions = db.get_historical_data(days=self.days, user_id=self.user_id)
 
             session_scores = []
             session_dates = []
@@ -157,9 +158,10 @@ class StatsWorker(QThread):
 
 
 class StatisticsTab(QWidget):
-    def __init__(self, settings):
+    def __init__(self, settings, user_id: int = 0):
         super().__init__()
         self.settings = settings
+        self.user_id = user_id
         self.worker = None
         self._init_ui()
 
@@ -217,7 +219,7 @@ class StatisticsTab(QWidget):
         days = int(self.period_combo.currentText().split()[0])
         db_path = self.settings.get('db_path', 'data/ergoboost.db')
 
-        self.worker = StatsWorker(db_path, days)
+        self.worker = StatsWorker(db_path, days, user_id=self.user_id)
         self.worker.finished.connect(self._display)
         self.worker.error.connect(self._show_error)
         self.worker.start()

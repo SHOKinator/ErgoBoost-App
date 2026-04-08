@@ -46,6 +46,7 @@ class Settings:
         # Posture
         'posture_control_enabled': True,
         'posture_sensitivity': 'medium',
+        'detection_mode': 'rule_based',   # 'rule_based' or 'ml'
 
         # Eye tracking
         'blink_tracking_enabled': True,

@@ -7,8 +7,8 @@ PySide6 Frontend with professional dark design
 import sys
 from pathlib import Path
 from PySide6.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QVBoxLayout,
-    QTabWidget, QMessageBox
+    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+    QTabWidget, QLabel, QPushButton, QMessageBox
 )
 from PySide6.QtCore import Qt, QThread
 from PySide6.QtGui import QIcon, QFont
@@ -19,6 +19,7 @@ from gui.statistics_tab import StatisticsTab
 from gui.exercises_tab import ExercisesTab
 from gui.settings_tab import SettingsTab
 from gui.monitoring_worker import MonitoringWorker
+from gui.screen_overlay import ScreenBlurOverlay
 
 from config.settings import Settings
 from utils.logger import setup_logger
@@ -305,16 +306,23 @@ QProgressBar::chunk {
 
 
 class ErgoBoostMainWindow(QMainWindow):
-    def __init__(self):
+    # Signal to request sign out (app.py will restart auth flow)
+    sign_out_requested = None  # set by app.py
+
+    def __init__(self, user: dict, auth_service=None):
         super().__init__()
+        self.user = user
+        self.user_id = user['id']
+        self.auth_service = auth_service
         self.settings = Settings()
         self._init_ui()
         self.monitoring_worker = None
         self.monitoring_thread = None
-        logger.info("ErgoBoost GUI initialized")
+        self.screen_overlay = ScreenBlurOverlay()
+        logger.info(f"ErgoBoost GUI initialized for user {user['username']}")
 
     def _init_ui(self):
-        self.setWindowTitle("ErgoBoost")
+        self.setWindowTitle(f"ErgoBoost — {self.user.get('display_name', self.user['username'])}")
         self.setMinimumSize(1280, 800)
 
         icon_path = Path("assets/icons/app_icon.png")
@@ -328,6 +336,29 @@ class ErgoBoostMainWindow(QMainWindow):
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
 
+        # User header bar
+        header = QWidget()
+        header.setStyleSheet("background-color: #16161e; border-bottom: 1px solid #1e1e2a;")
+        header.setFixedHeight(36)
+        h_layout = QHBoxLayout(header)
+        h_layout.setContentsMargins(16, 0, 16, 0)
+        h_layout.setSpacing(8)
+        h_layout.addStretch()
+
+        user_label = QLabel(f"{self.user.get('display_name', self.user['username'])}")
+        user_label.setStyleSheet("color: #8a8a9a; font-size: 12px; background: transparent; border: none;")
+        h_layout.addWidget(user_label)
+
+        sign_out_btn = QPushButton("Sign Out")
+        sign_out_btn.setStyleSheet(
+            "QPushButton { background: transparent; color: #6c8cff; border: none; "
+            "font-size: 11px; padding: 4px 8px; } "
+            "QPushButton:hover { color: #8cacff; }"
+        )
+        sign_out_btn.clicked.connect(self._on_sign_out)
+        h_layout.addWidget(sign_out_btn)
+        main_layout.addWidget(header)
+
         self.tab_widget = QTabWidget()
         self.tab_widget.setTabPosition(QTabWidget.North)
         self.tab_widget.setDocumentMode(True)
@@ -335,8 +366,8 @@ class ErgoBoostMainWindow(QMainWindow):
         self.setStyleSheet(STYLESHEET)
 
         self.dashboard_tab = DashboardTab(self.settings)
-        self.sessions_tab = SessionsTab(self.settings)
-        self.statistics_tab = StatisticsTab(self.settings)
+        self.sessions_tab = SessionsTab(self.settings, user_id=self.user_id)
+        self.statistics_tab = StatisticsTab(self.settings, user_id=self.user_id)
         self.exercises_tab = ExercisesTab(self.settings)
         self.settings_tab = SettingsTab(self.settings)
 
@@ -362,7 +393,7 @@ class ErgoBoostMainWindow(QMainWindow):
             return
         try:
             self.monitoring_thread = QThread()
-            self.monitoring_worker = MonitoringWorker(self.settings)
+            self.monitoring_worker = MonitoringWorker(self.settings, user_id=self.user_id)
             self.monitoring_worker.moveToThread(self.monitoring_thread)
 
             self.monitoring_worker.frame_ready.connect(self.dashboard_tab.update_camera_frame)
@@ -370,6 +401,7 @@ class ErgoBoostMainWindow(QMainWindow):
             self.monitoring_worker.alert_triggered.connect(self.dashboard_tab.show_alert)
             self.monitoring_worker.calibration_progress.connect(self.dashboard_tab.update_calibration_progress)
             self.monitoring_worker.error_occurred.connect(self.on_monitoring_error)
+            self.monitoring_worker.overlay_requested.connect(self._on_overlay_requested)
 
             self.monitoring_thread.started.connect(self.monitoring_worker.run)
             self.monitoring_worker.finished.connect(self.monitoring_thread.quit)
@@ -405,6 +437,12 @@ class ErgoBoostMainWindow(QMainWindow):
     def on_monitoring_error(self, error_msg):
         QMessageBox.warning(self, "Monitoring Error", error_msg)
 
+    def _on_overlay_requested(self, show: bool, message: str):
+        if show:
+            self.screen_overlay.show_overlay(message)
+        else:
+            self.screen_overlay.hide_overlay()
+
     def on_settings_changed(self):
         if self.monitoring_worker:
             self.monitoring_worker.update_settings(self.settings)
@@ -416,6 +454,20 @@ class ErgoBoostMainWindow(QMainWindow):
             self.sessions_tab.refresh_sessions()
         elif "Statistics" in tab_name:
             self.statistics_tab.refresh_statistics()
+
+    def _on_sign_out(self):
+        """Handle sign out"""
+        if self.monitoring_worker is not None:
+            QMessageBox.warning(self, "Cannot Sign Out",
+                "Stop monitoring first before signing out.")
+            return
+        if self.auth_service:
+            self.auth_service.sign_out()
+        self.screen_overlay.hide_overlay()
+        self.close()
+        # Signal to app that we want to restart auth
+        if self.sign_out_requested:
+            self.sign_out_requested()
 
     def closeEvent(self, event):
         if self.monitoring_worker is not None:
@@ -437,14 +489,38 @@ class ErgoBoostMainWindow(QMainWindow):
 
 
 def main():
+    """Main entry point with auth flow"""
     app = QApplication(sys.argv)
     app.setApplicationName("ErgoBoost")
     app.setOrganizationName("ErgoBoost")
     app.setApplicationVersion("1.0.0")
 
-    window = ErgoBoostMainWindow()
-    window.show()
+    from gui.auth_window import AuthWindow
 
+    # Keep reference to prevent garbage collection
+    app._main_window = None
+
+    def run_auth():
+        # Close existing window if sign out
+        if app._main_window is not None:
+            app._main_window.close()
+            app._main_window = None
+
+        auth_win = AuthWindow()
+        result = auth_win.exec()
+
+        if result == AuthWindow.Accepted and auth_win.get_user():
+            user = auth_win.get_user()
+            auth_service = auth_win.get_auth_service()
+
+            window = ErgoBoostMainWindow(user=user, auth_service=auth_service)
+            window.sign_out_requested = run_auth
+            window.show()
+            app._main_window = window  # prevent GC
+        else:
+            app.quit()
+
+    run_auth()
     sys.exit(app.exec())
 
 

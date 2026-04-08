@@ -23,6 +23,20 @@ from services.session_manager import SessionManager
 from data.sqlite_repo import SQLiteRepository
 from utils.logger import setup_logger
 
+# ML predictor (optional — works without trained model)
+try:
+    from ml.predictor import PosturePredictor
+    _ML_AVAILABLE = True
+except ImportError:
+    _ML_AVAILABLE = False
+
+# Online trainer (optional — retrains model from rule-based data)
+try:
+    from ml.online_trainer import OnlineTrainer
+    _TRAINER_AVAILABLE = True
+except ImportError:
+    _TRAINER_AVAILABLE = False
+
 logger = setup_logger(__name__)
 
 
@@ -33,10 +47,12 @@ class MonitoringWorker(QObject):
     calibration_progress = Signal(float)
     error_occurred = Signal(str)
     finished = Signal()
+    overlay_requested = Signal(bool, str)
 
-    def __init__(self, settings):
+    def __init__(self, settings, user_id: int = 0):
         super().__init__()
         self.settings = settings
+        self.user_id = user_id
         self.running = False
         self.paused = False
 
@@ -51,6 +67,9 @@ class MonitoringWorker(QObject):
         self.baseline = None
         self.break_reminder = None
         self.alert_manager = None
+        self.ml_predictor = None
+        self.online_trainer = None
+        self._session_detection_mode = 'rule_based'
 
         self.last_log_time = 0
         self.last_alert_time = {}
@@ -59,6 +78,8 @@ class MonitoringWorker(QObject):
 
         # Flag: calibration just finished this frame
         self._calibration_just_finished = False
+        self._is_overlay_active = False
+        self._bad_state_start_time = None
 
     def run(self):
         try:
@@ -131,8 +152,23 @@ class MonitoringWorker(QObject):
         else:
             self.baseline.start_calibration()
 
-        self.session_id = self.session_manager.start_session()
+        self.session_id = self.session_manager.start_session(self.user_id)
         self.running = True
+
+        # ML predictor (optional)
+        self._session_detection_mode = self.settings.get('detection_mode', 'rule_based')
+        if _ML_AVAILABLE and self._session_detection_mode == 'ml':
+            self.ml_predictor = PosturePredictor()
+            if self.ml_predictor.is_available():
+                logger.info("ML posture predictor loaded")
+            else:
+                logger.warning("ML model not found, falling back to rule-based")
+                self.ml_predictor = None
+
+        # Online trainer — will retrain model after rule-based sessions
+        if _TRAINER_AVAILABLE:
+            self.online_trainer = OnlineTrainer()
+
         logger.info("Monitoring worker initialized")
 
     def _monitoring_loop(self):
@@ -234,6 +270,8 @@ class MonitoringWorker(QObject):
             'lateral_tilt': None,
             'posture_status': 'OK',
             'severity': 0.0,
+            'confidence': 0.0,
+            'detection_method': 'ml' if self.ml_predictor else 'rules',
             'messages': [],
             'calibration_status': self.baseline.get_status(),
             'is_present': is_present,
@@ -300,11 +338,33 @@ class MonitoringWorker(QObject):
             }
             deviation = self.baseline.deviation(cal_metrics)
 
-            if deviation:
+            # Choose detection method: ML or rule-based
+            if self.ml_predictor is not None and metrics['forward_shift'] is not None:
+                # === ML-based detection ===
+                # Pass deviation values (not raw), matching training data distribution
+                dev_forward = deviation.get('forward_shift', 0.0) if deviation else 0.0
+                dev_lateral = deviation.get('lateral_tilt', 0.0) if deviation else 0.0
+
+                ml_result = self.ml_predictor.predict(
+                    forward_shift=dev_forward,
+                    lateral_tilt=dev_lateral,
+                )
+                metrics['posture_status'] = ml_result['status']
+                metrics['severity'] = ml_result['severity']
+                metrics['confidence'] = ml_result['confidence']
+                metrics['detection_method'] = 'ml'
+
+                if ml_result['status'] == 'BAD':
+                    messages = [f"Bad posture detected (ML confidence: {ml_result['confidence']:.0%})"]
+                    metrics['messages'] = messages
+                    self._trigger_alert('posture', messages, ml_result['severity'])
+            elif deviation:
+                # === Rule-based detection ===
                 has_issue, messages, severity = self.pose_detector.evaluate_posture(deviation)
                 metrics['posture_status'] = 'BAD' if has_issue else 'OK'
                 metrics['severity'] = severity
                 metrics['messages'] = messages
+                metrics['detection_method'] = 'rule_based'
 
                 if has_issue:
                     self._trigger_alert('posture', messages, severity)
@@ -314,15 +374,26 @@ class MonitoringWorker(QObject):
             self._trigger_alert('distance',
                 [f"Too {metrics['distance_status'].lower().replace('_', ' ')}"], 1.0)
 
-        # Blur reaction mode
+        # OS Screen overlay logic
         reaction_mode = self.settings.get('reaction_mode', 'alert_only')
-        if reaction_mode == 'blur_monitor' and not is_calibrating:
-            if metrics['posture_status'] == 'BAD' or metrics['distance_status'] not in ('OK', 'Unknown'):
-                annotated = cv2.GaussianBlur(annotated, (51, 51), 30)
-                h, w = annotated.shape[:2]
-                cv2.putText(annotated, "FIX YOUR POSTURE!",
-                    (w // 2 - 200, h // 2),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255, 80, 80), 3)
+        if reaction_mode == 'blur_os_screen' and not is_calibrating:
+            is_bad_state = (metrics['posture_status'] == 'BAD' or 
+                            metrics['distance_status'] not in ('OK', 'Unknown'))
+            if is_bad_state:
+                if self._bad_state_start_time is None:
+                    self._bad_state_start_time = time.time()
+                elif time.time() - self._bad_state_start_time >= 4.0:  # 4 seconds delay
+                    if not self._is_overlay_active:
+                        msg = "Нарушение осанки!"
+                        if metrics.get('messages'):
+                            msg = metrics['messages'][0]
+                        self.overlay_requested.emit(True, msg)
+                        self._is_overlay_active = True
+            else:
+                self._bad_state_start_time = None
+                if self._is_overlay_active:
+                    self.overlay_requested.emit(False, "")
+                    self._is_overlay_active = False
 
         return annotated, metrics
 
@@ -374,12 +445,22 @@ class MonitoringWorker(QObject):
 
     def _cleanup(self):
         logger.info("Cleaning up monitoring worker...")
+        if self._is_overlay_active:
+            self.overlay_requested.emit(False, "")
+            self._is_overlay_active = False
         if self.session_id:
             self.session_manager.end_session(self.session_id)
         if self.camera:
             self.camera.release()
         if self.db:
             self.db.close()
+
+        # Trigger background retraining after rule-based sessions
+        if (self.online_trainer is not None
+                and self._session_detection_mode == 'rule_based'):
+            logger.info("Rule-based session ended — checking if model retraining is needed")
+            self.online_trainer.maybe_retrain_async(predictor=self.ml_predictor)
+
         logger.info("Monitoring worker cleaned up")
 
     def stop(self):

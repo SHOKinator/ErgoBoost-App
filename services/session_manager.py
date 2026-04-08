@@ -9,9 +9,9 @@ class SessionManager:
     def __init__(self, db):
         self.db = db
 
-    def start_session(self):
-        session_id = self.db.start_session()
-        logger.info(f"Started session {session_id}")
+    def start_session(self, user_id=0):
+        session_id = self.db.start_session(user_id=user_id)
+        logger.info(f"Started session {session_id} for user {user_id}")
         return session_id
 
     def end_session(self, session_id):

@@ -104,6 +104,19 @@ class SettingsTab(QWidget):
         info = QLabel("Low: fewer alerts  |  Medium: balanced  |  High: strict")
         info.setStyleSheet("color: #5a5a6a; font-size: 11px;")
         layout.addWidget(info)
+
+        row = QHBoxLayout()
+        row.addWidget(QLabel("Detection:"))
+        self.detection_combo = QComboBox()
+        self.detection_combo.addItems(["Rule-based", "ML Model"])
+        row.addWidget(self.detection_combo)
+        row.addStretch()
+        layout.addLayout(row)
+
+        det_info = QLabel("Rule-based: threshold logic  |  ML Model: trained classifier (97% acc)")
+        det_info.setStyleSheet("color: #5a5a6a; font-size: 11px;")
+        layout.addWidget(det_info)
+
         return group
 
     def _create_alert_group(self):
@@ -113,7 +126,7 @@ class SettingsTab(QWidget):
         row = QHBoxLayout()
         row.addWidget(QLabel("Reaction:"))
         self.reaction_combo = QComboBox()
-        self.reaction_combo.addItems(["Alert only", "Blur monitor"])
+        self.reaction_combo.addItems(["Alert only", "Blur OS"])
         row.addWidget(self.reaction_combo)
         row.addStretch()
         layout.addLayout(row)
@@ -211,9 +224,14 @@ class SettingsTab(QWidget):
         self.sensitivity_combo.setCurrentText(
             s.get('posture_sensitivity', 'medium').capitalize())
 
+        mode = s.get('detection_mode', 'rule_based')
+        self.detection_combo.setCurrentText("ML Model" if mode == 'ml' else "Rule-based")
+
         rm = s.get('reaction_mode', 'alert_only')
-        self.reaction_combo.setCurrentText(
-            "Alert only" if rm == 'alert_only' else "Blur monitor")
+        if rm == 'blur_os_screen':
+            self.reaction_combo.setCurrentText("Blur OS")
+        else:
+            self.reaction_combo.setCurrentText("Alert only")
 
         self.sound_cb.setChecked(s.get('sound_alerts_enabled', False))
         self.cooldown_slider.setValue(int(s.get('alert_cooldown', 30)))
@@ -236,9 +254,14 @@ class SettingsTab(QWidget):
 
         s.set('posture_control_enabled', self.posture_enabled_cb.isChecked())
         s.set('posture_sensitivity', self.sensitivity_combo.currentText().lower())
+        s.set('detection_mode',
+              'ml' if self.detection_combo.currentText() == "ML Model" else 'rule_based')
 
-        s.set('reaction_mode',
-              'alert_only' if self.reaction_combo.currentText() == "Alert only" else 'blur_monitor')
+        rm_text = self.reaction_combo.currentText()
+        if rm_text == "Blur OS":
+            s.set('reaction_mode', 'blur_os_screen')
+        else:
+            s.set('reaction_mode', 'alert_only')
         s.set('sound_alerts_enabled', self.sound_cb.isChecked())
         s.set('alert_cooldown', self.cooldown_slider.value())
 
