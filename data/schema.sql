@@ -1,8 +1,18 @@
 -- data/schema.sql
 -- ErgoBoost Database Schema
 
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    salt TEXT NOT NULL,
+    display_name TEXT DEFAULT '',
+    created_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS sessions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL DEFAULT 0,
     start_time TEXT NOT NULL,
     end_time TEXT,
     duration_seconds REAL,
@@ -12,7 +22,8 @@ CREATE TABLE IF NOT EXISTS sessions (
     total_breaks INTEGER DEFAULT 0,
     avg_blink_rate REAL,
     avg_distance_ratio REAL,
-    good_posture_percent REAL
+    good_posture_percent REAL,
+    FOREIGN KEY(user_id) REFERENCES users(id)
 );
 
 CREATE TABLE IF NOT EXISTS posture_events (
@@ -55,11 +66,14 @@ CREATE TABLE IF NOT EXISTS presence_events (
 );
 
 CREATE TABLE IF NOT EXISTS user_settings (
-    key TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL DEFAULT 0,
+    key TEXT NOT NULL,
     value TEXT NOT NULL,
-    updated_at TEXT NOT NULL
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY(user_id, key)
 );
 
+CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id, start_time);
 CREATE INDEX IF NOT EXISTS idx_posture_session ON posture_events(session_id, timestamp);
 CREATE INDEX IF NOT EXISTS idx_eye_session ON eye_events(session_id, timestamp);
 CREATE INDEX IF NOT EXISTS idx_distance_session ON distance_events(session_id, timestamp);

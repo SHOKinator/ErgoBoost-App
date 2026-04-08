@@ -7,13 +7,16 @@ numpy>=1.24
 PyYAML>=6.0
 matplotlib>=3.7
 psutil>=5.9
+# ML Training
+scikit-learn>=1.3
+pandas>=2.0
 
 # Windows notifications (Windows only)
 winotify>=1.1.0; sys_platform == 'win32'
 
-# Optional: PySpark analytics (for Big Data diploma)
+# Big Data (for diploma)
 # pyspark>=3.5
-# Install sqlite-jdbc jar separately into libs/ folder
+# Download sqlite-jdbc jar separately into libs/
 
 # Optional: sound alerts
 # playsound>=1.3

@@ -73,10 +73,24 @@ class BaselineCalibrator:
             return None
 
         deviation = {}
+
+        WEIGHTS = {
+            "forward_shift": 1.5,
+            "lateral_tilt": 1.0,
+        }
+
         for k, base_val in self.baseline.items():
             cur_val = current.get(k)
             if cur_val is not None:
-                deviation[k] = cur_val - base_val
+                raw_dev = cur_val - base_val
+
+                # remove noise
+                if abs(raw_dev) < 0.01:
+                    raw_dev = 0
+
+                # apply weight
+                deviation[k] = raw_dev * WEIGHTS.get(k, 1.0)
+
         return deviation
 
     def get_baseline_value(self, key: str):
