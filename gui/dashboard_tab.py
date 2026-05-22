@@ -100,6 +100,28 @@ class DashboardTab(QWidget):
         self.calibration_bar.hide()
         layout.addWidget(self.calibration_bar)
 
+        self.countdown_bar = QProgressBar()
+        self.countdown_bar.setMaximum(100)
+        self.countdown_bar.setTextVisible(True)
+        self.countdown_bar.setFormat("Overlay in %vs...")
+        self.countdown_bar.setStyleSheet("""
+            QProgressBar {
+                border: 1px solid #5a3030;
+                border-radius: 3px;
+                text-align: center;
+                background-color: #1a1a24;
+                color: #ff9090;
+                height: 22px;
+                font-size: 11px;
+            }
+            QProgressBar::chunk {
+                background-color: #c04050;
+                border-radius: 2px;
+            }
+        """)
+        self.countdown_bar.hide()
+        layout.addWidget(self.countdown_bar)
+
         return panel
 
     def _create_metrics_panel(self):
@@ -414,3 +436,20 @@ class DashboardTab(QWidget):
         self.alert_text.setStyleSheet(f"color: {text_c}; font-size: 12px; background: transparent;")
         self.alert_banner.show()
         QTimer.singleShot(8000, self.alert_banner.hide)
+
+    def update_overlay_countdown(self, seconds: int):
+        """Show/hide overlay countdown indicator.
+        seconds: -1=hide, 0=active, 1-N=counting down
+        """
+        if seconds < 0:
+            self.countdown_bar.hide()
+        elif seconds == 0:
+            self.countdown_bar.hide()  # overlay is now active, bar not needed
+        else:
+            delay = max(seconds, 1)
+            # Invert: bar fills up as time runs out
+            max_delay = 4  # approximate
+            pct = int(((max_delay - seconds) / max_delay) * 100)
+            self.countdown_bar.setValue(max(0, min(100, pct)))
+            self.countdown_bar.setFormat(f"Overlay in {seconds}s...")
+            self.countdown_bar.show()

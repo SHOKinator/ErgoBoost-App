@@ -56,12 +56,24 @@ class Settings:
 
         # Reaction
         'reaction_mode': 'alert_only',
+        'overlay_delay_seconds': 4,
 
         # UI
         'show_face_landmarks': True,
         'show_pose_landmarks': True,
         'window_width': 1280,
         'window_height': 800,
+
+        # Auto-start
+        'auto_start_monitoring': False,
+
+        # Hotkeys
+        'hotkey_toggle_monitoring': 'Ctrl+M',
+        'hotkey_toggle_pause': 'Ctrl+P',
+        'hotkey_dismiss_overlay': 'Escape',
+
+        # Do Not Disturb
+        'dnd_duration_minutes': 30,
 
         # Database
         'db_path': 'data/ergoboost.db',
@@ -100,6 +112,11 @@ class Settings:
 
     def set(self, key: str, value: Any):
         self.config[key] = value
+        self._save_config(self.config)
+
+    def batch_update(self, updates: Dict):
+        """Update multiple settings at once with a single disk write."""
+        self.config.update(updates)
         self._save_config(self.config)
 
     def reset_to_defaults(self):

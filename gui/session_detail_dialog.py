@@ -15,28 +15,19 @@ import numpy as np
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-from matplotlib.backends.backend_agg import FigureCanvasAgg
+
+from utils.chart_utils import fig_to_pixmap, BG, CARD_BG, GRID, TEXT
+from utils.chart_utils import BLUE as ACCENT_BLUE
+from utils.chart_utils import GREEN as ACCENT_GREEN
+from utils.chart_utils import RED as ACCENT_RED
+from utils.chart_utils import ORANGE as ACCENT_ORANGE
 
 
-# Chart colors
-BG_COLOR = '#0f0f14'
-CARD_BG = '#16161e'
-GRID_COLOR = '#1e1e2a'
-TEXT_COLOR = '#8a8a9a'
-ACCENT_BLUE = '#6c8cff'
-ACCENT_GREEN = '#5a9a6a'
-ACCENT_RED = '#c04050'
-ACCENT_ORANGE = '#b08030'
+TEXT_COLOR = TEXT
+GRID_COLOR = GRID
+BG_COLOR = BG
 
 
-def _fig_to_pixmap(fig):
-    canvas = FigureCanvasAgg(fig)
-    canvas.draw()
-    buf = canvas.buffer_rgba()
-    arr = np.asarray(buf)
-    h, w, ch = arr.shape
-    qimg = QImage(arr.data, w, h, ch * w, QImage.Format_RGBA8888)
-    return QPixmap.fromImage(qimg)
 
 
 class SessionDetailDialog(QDialog):
@@ -194,7 +185,7 @@ class SessionDetailDialog(QDialog):
                 severities.append(ev['severity'] or 0)
                 fwd_shifts.append(ev['forward_shift'] or 0)
                 tilts.append(ev['lateral_tilt'] or 0)
-            except:
+            except Exception:
                 continue
 
         if not timestamps:
@@ -223,7 +214,7 @@ class SessionDetailDialog(QDialog):
         axes[1].legend(fontsize=8, facecolor=BG_COLOR, edgecolor=GRID_COLOR, labelcolor=TEXT_COLOR)
 
         plt.tight_layout()
-        pixmap = _fig_to_pixmap(fig)
+        pixmap = fig_to_pixmap(fig)
         plt.close(fig)
 
         chart_label = QLabel()
@@ -278,7 +269,7 @@ class SessionDetailDialog(QDialog):
         axes[1].set_title('Eye Aspect Ratio', color='#c8c8d8', fontsize=11, fontweight='600')
 
         plt.tight_layout()
-        pixmap = _fig_to_pixmap(fig)
+        pixmap = fig_to_pixmap(fig)
         plt.close(fig)
 
         chart_label = QLabel()
@@ -324,7 +315,7 @@ class SessionDetailDialog(QDialog):
         ax.set_title('Screen Distance Over Time', color='#c8c8d8', fontsize=11, fontweight='600')
 
         plt.tight_layout()
-        pixmap = _fig_to_pixmap(fig)
+        pixmap = fig_to_pixmap(fig)
         plt.close(fig)
 
         chart_label = QLabel()

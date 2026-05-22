@@ -24,6 +24,11 @@ class SessionsTab(QWidget):
         self._init_ui()
         self.refresh_sessions()
 
+    def closeEvent(self, event):
+        if self.db:
+            self.db.close()
+        super().closeEvent(event)
+
     def _init_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(16, 16, 16, 16)

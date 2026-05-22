@@ -1,10 +1,10 @@
 # ml/generate_diploma_charts.py
 """
-Генерация графиков для дипломной работы.
-Загружает training_report.json и posture_classifier.pkl,
-создаёт красивые PNG-диаграммы для вставки в диплом.
+Diploma chart generation.
+Loads training_report.json and posture_classifier.pkl,
+creates publication-quality PNG charts for the thesis.
 
-Использование:
+Usage:
     python -m ml.generate_diploma_charts
     python -m ml.generate_diploma_charts --output diploma_charts
 """
@@ -107,8 +107,8 @@ def chart_model_comparison(report, output_dir):
                         ha='center', va='bottom', fontsize=10, fontweight='bold',
                         color=COLORS['text'])
 
-    ax.set_ylabel('Значение метрики')
-    ax.set_title('Сравнение моделей классификации осанки')
+    ax.set_ylabel('Metric Value')
+    ax.set_title('Posture Classification Model Comparison')
     ax.set_xticks(x)
     ax.set_xticklabels(labels)
     ax.set_ylim(0.92, 1.005)
@@ -137,7 +137,7 @@ def chart_confusion_matrices(report, output_dir):
         ('Gradient Boosting', report['results']['gradient_boosting'], COLORS['gb']),
     ]
 
-    class_labels = ['OK (норма)', 'BAD (нарушение)']
+    class_labels = ['OK (normal)', 'BAD (violation)']
 
     for ax, (name, data, color) in zip(axes, models):
         cm = np.array(data['confusion_matrix'])
@@ -153,8 +153,8 @@ def chart_confusion_matrices(report, output_dir):
         ax.set_yticks([0, 1])
         ax.set_xticklabels(class_labels, fontsize=10)
         ax.set_yticklabels(class_labels, fontsize=10)
-        ax.set_xlabel('Предсказанный класс', fontsize=11)
-        ax.set_ylabel('Истинный класс', fontsize=11)
+        ax.set_xlabel('Predicted Class', fontsize=11)
+        ax.set_ylabel('True Class', fontsize=11)
         ax.set_title(name, fontsize=14, fontweight='bold', pad=10)
 
         # Annotate cells
@@ -167,7 +167,7 @@ def chart_confusion_matrices(report, output_dir):
                         ha='center', va='center', fontsize=12,
                         fontweight='bold', color=text_color)
 
-    fig.suptitle('Матрицы ошибок (Confusion Matrix)', fontsize=16,
+    fig.suptitle('Confusion Matrices', fontsize=16,
                  fontweight='bold', y=1.02)
     plt.tight_layout()
     path = output_dir / '02_confusion_matrices.png'
@@ -190,11 +190,11 @@ def chart_feature_importance(report, output_dir):
 
     # Readable names mapping
     name_map = {
-        'tilt_abs': 'Абс. наклон плеч (|tilt|)',
-        'shift_x_tilt': 'Наклон × Смещение (interaction)',
-        'shift_abs': 'Абс. смещение головы (|shift|)',
-        'lateral_tilt': 'Боковой наклон плеч',
-        'forward_shift': 'Смещение головы вперёд',
+        'tilt_abs': 'Abs. Shoulder Tilt (|tilt|)',
+        'shift_x_tilt': 'Tilt × Shift (interaction)',
+        'shift_abs': 'Abs. Head Shift (|shift|)',
+        'lateral_tilt': 'Lateral Shoulder Tilt',
+        'forward_shift': 'Forward Head Shift',
     }
     display_names = [name_map.get(n, n) for n in names]
 
@@ -212,8 +212,8 @@ def chart_feature_importance(report, output_dir):
                 f'{val:.4f}', ha='left', va='center', fontsize=10,
                 fontweight='bold', color=COLORS['text'])
 
-    ax.set_xlabel('Важность признака (Feature Importance)')
-    ax.set_title('Важность признаков — Random Forest')
+    ax.set_xlabel('Feature Importance')
+    ax.set_title('Feature Importance — Random Forest')
     ax.set_xlim(0, max(values) * 1.2)
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
@@ -250,10 +250,10 @@ def chart_per_class_metrics(report, output_dir):
         x = np.arange(len(labels))
         width = 0.3
 
-        bars_ok = ax.bar(x - width/2, ok_vals, width, label='OK (норма)',
+        bars_ok = ax.bar(x - width/2, ok_vals, width, label='OK (normal)',
                          color=COLORS['ok'], edgecolor='white', linewidth=1.5,
                          zorder=3, alpha=0.85)
-        bars_bad = ax.bar(x + width/2, bad_vals, width, label='BAD (нарушение)',
+        bars_bad = ax.bar(x + width/2, bad_vals, width, label='BAD (violation)',
                           color=COLORS['bad'], edgecolor='white', linewidth=1.5,
                           zorder=3, alpha=0.85)
 
@@ -273,7 +273,7 @@ def chart_per_class_metrics(report, output_dir):
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
 
-    fig.suptitle('Метрики по классам', fontsize=16, fontweight='bold', y=1.02)
+    fig.suptitle('Per-Class Metrics', fontsize=16, fontweight='bold', y=1.02)
     plt.tight_layout()
     path = output_dir / '04_per_class_metrics.png'
     plt.savefig(path)
@@ -300,7 +300,7 @@ def chart_dataset_distribution(report, output_dir):
     wedges, texts = ax1.pie(sizes, labels=labels_split, colors=colors_split,
                             startangle=90, textprops={'fontsize': 12, 'fontweight': 'bold'},
                             wedgeprops={'edgecolor': 'white', 'linewidth': 2})
-    ax1.set_title('Разделение датасета', fontsize=13, fontweight='bold', pad=15)
+    ax1.set_title('Dataset Split', fontsize=13, fontweight='bold', pad=15)
 
     # --- Right: Class distribution ---
     ax2 = axes[1]
@@ -316,7 +316,7 @@ def chart_dataset_distribution(report, output_dir):
     full_ok = int(report['dataset_size'] * ratio_ok)
     full_bad = int(report['dataset_size'] * ratio_bad)
 
-    bars = ax2.bar(['OK (норма)', 'BAD (нарушение)'],
+    bars = ax2.bar(['OK (normal)', 'BAD (violation)'],
                    [full_ok, full_bad],
                    color=[COLORS['ok'], COLORS['bad']],
                    edgecolor='white', linewidth=2, width=0.5, zorder=3, alpha=0.85)
@@ -327,8 +327,8 @@ def chart_dataset_distribution(report, output_dir):
                  f'{val:,}\n({pct:.1f}%)', ha='center', va='bottom',
                  fontsize=12, fontweight='bold', color=COLORS['text'])
 
-    ax2.set_ylabel('Количество записей')
-    ax2.set_title('Распределение классов', fontsize=13, fontweight='bold')
+    ax2.set_ylabel('Number of Records')
+    ax2.set_title('Class Distribution', fontsize=13, fontweight='bold')
     ax2.spines['top'].set_visible(False)
     ax2.spines['right'].set_visible(False)
     ax2.set_facecolor('white')
@@ -380,7 +380,7 @@ def chart_radar_comparison(report, output_dir):
 
     ax.legend(loc='lower right', bbox_to_anchor=(1.15, -0.05),
               fontsize=11, framealpha=0.9)
-    ax.set_title('Многокритериальное сравнение моделей',
+    ax.set_title('Multi-Criteria Model Comparison',
                  fontsize=15, fontweight='bold', pad=25)
 
     plt.tight_layout()
@@ -445,7 +445,7 @@ def chart_cross_validation(report, output_dir):
                     fontsize=10, fontweight='bold')
 
     ax.set_ylabel('F1-Score')
-    ax.set_title('Валидация: Test vs Random CV vs GroupKFold (по сессиям)')
+    ax.set_title('Validation: Test vs Random CV vs GroupKFold (by session)')
     ax.set_xticks(x)
     ax.set_xticklabels(labels)
 
@@ -461,10 +461,10 @@ def chart_cross_validation(report, output_dir):
     # Add annotation about generalization
     delta = abs(rf.get('cv_f1_mean', 0) - rf.get('group_cv_f1_mean', 0))
     if delta < 0.02:
-        msg = f'\u0394 = {delta:.4f} — модель обобщает (не запоминает сессии) \u2713'
+        msg = f'\u0394 = {delta:.4f} — model generalizes (no session memorization) \u2713'
         color = COLORS['ok']
     else:
-        msg = f'\u0394 = {delta:.4f} — возможное переобучение на сессиях \u26a0'
+        msg = f'\u0394 = {delta:.4f} — possible overfitting on sessions \u26a0'
         color = COLORS['bad']
     ax.text(0.5, 0.02, msg, transform=ax.transAxes, ha='center',
             fontsize=12, fontweight='bold', color=color,
@@ -490,8 +490,8 @@ def chart_summary_table(report, output_dir):
     fig.patch.set_facecolor('white')
     ax.axis('off')
 
-    columns = ['Модель', 'Accuracy', 'Precision', 'Recall', 'F1-Score',
-               'Объём выборки']
+    columns = ['Model', 'Accuracy', 'Precision', 'Recall', 'F1-Score',
+               'Dataset Size']
     rows = [
         ['Random Forest',
          f'{rf["accuracy"]:.4f}', f'{rf["precision"]:.4f}',
@@ -543,7 +543,7 @@ def chart_summary_table(report, output_dir):
             cell.set_edgecolor(COLORS['grid'])
             cell.set_text_props(fontsize=11)
 
-    ax.set_title('Сводная таблица результатов обучения',
+    ax.set_title('Training Results Summary Table',
                  fontsize=15, fontweight='bold', pad=20)
 
     plt.tight_layout()
@@ -579,8 +579,8 @@ def chart_normalized_confusion(report, output_dir):
         ax.set_yticks([0, 1])
         ax.set_xticklabels(class_labels, fontsize=12)
         ax.set_yticklabels(class_labels, fontsize=12)
-        ax.set_xlabel('Предсказание', fontsize=12)
-        ax.set_ylabel('Истина', fontsize=12)
+        ax.set_xlabel('Predicted', fontsize=12)
+        ax.set_ylabel('Actual', fontsize=12)
         ax.set_title(name, fontsize=14, fontweight='bold', pad=10)
 
         for i in range(2):
@@ -593,7 +593,7 @@ def chart_normalized_confusion(report, output_dir):
 
         plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04, format='%.0f%%')
 
-    fig.suptitle('Нормализованные матрицы ошибок (по строкам)',
+    fig.suptitle('Normalized Confusion Matrices (row-wise)',
                  fontsize=16, fontweight='bold', y=1.02)
     plt.tight_layout()
     path = output_dir / '09_normalized_confusion.png'
@@ -650,14 +650,14 @@ def chart_error_analysis(report, output_dir):
     for i, d in enumerate(models_data):
         error_total = d['FP'] + d['FN']
         error_pct = error_total / d['total'] * 100
-        ax.text(i, d['total'] + 500, f'Ошибки: {error_total:,} ({error_pct:.2f}%)',
+        ax.text(i, d['total'] + 500, f'Errors: {error_total:,} ({error_pct:.2f}%)',
                 ha='center', va='bottom', fontsize=11, fontweight='bold',
                 color=COLORS['bad'])
 
     ax.set_xticks(x)
     ax.set_xticklabels(names, fontsize=12)
-    ax.set_ylabel('Количество предсказаний')
-    ax.set_title('Анализ ошибок классификации')
+    ax.set_ylabel('Number of Predictions')
+    ax.set_title('Classification Error Analysis')
     ax.legend(loc='center right', fontsize=9, framealpha=0.9)
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
@@ -692,8 +692,8 @@ def chart_session_split(report, output_dir):
     ax1 = axes[0]
     sizes = [train_sessions, test_sessions]
     labels = [
-        f'Train\n{train_sessions} сессий',
-        f'Test\n{test_sessions} сессий',
+        f'Train\n{train_sessions} sessions',
+        f'Test\n{test_sessions} sessions',
     ]
     colors = [COLORS['rf'], COLORS['accent']]
     explode = (0.03, 0.03)
@@ -702,7 +702,7 @@ def chart_session_split(report, output_dir):
                             explode=explode, startangle=90,
                             textprops={'fontsize': 13, 'fontweight': 'bold'},
                             wedgeprops={'edgecolor': 'white', 'linewidth': 2})
-    ax1.set_title(f'Разделение по сессиям\n(всего {total_sessions})',
+    ax1.set_title(f'Session-Based Split\n(total {total_sessions})',
                   fontsize=13, fontweight='bold', pad=15)
 
     # Right: samples per split
@@ -710,19 +710,19 @@ def chart_session_split(report, output_dir):
     ax2.set_facecolor('white')
 
     split_data = {
-        'Сессии': [train_sessions, test_sessions],
-        'Записи': [report['train_size'], report['test_size']],
+        'Sessions': [train_sessions, test_sessions],
+        'Records': [report['train_size'], report['test_size']],
     }
     x = np.arange(2)
     width = 0.3
 
-    bars1 = ax2.bar(x - width/2, split_data['Сессии'], width,
-                    label='Сессии', color=COLORS['rf'],
+    bars1 = ax2.bar(x - width/2, split_data['Sessions'], width,
+                    label='Sessions', color=COLORS['rf'],
                     edgecolor='white', linewidth=1.5, zorder=3)
     # Create secondary y-axis for samples
     ax2b = ax2.twinx()
-    bars2 = ax2b.bar(x + width/2, split_data['Записи'], width,
-                     label='Записи', color=COLORS['accent'],
+    bars2 = ax2b.bar(x + width/2, split_data['Records'], width,
+                     label='Records', color=COLORS['accent'],
                      edgecolor='white', linewidth=1.5, zorder=3, alpha=0.85)
 
     for bar in bars1:
@@ -736,9 +736,9 @@ def chart_session_split(report, output_dir):
 
     ax2.set_xticks(x)
     ax2.set_xticklabels(['Train', 'Test'], fontsize=12)
-    ax2.set_ylabel('Количество сессий', color=COLORS['rf'])
-    ax2b.set_ylabel('Количество записей', color=COLORS['accent'])
-    ax2.set_title('GroupShuffleSplit: сессии и записи',
+    ax2.set_ylabel('Number of Sessions', color=COLORS['rf'])
+    ax2b.set_ylabel('Number of Records', color=COLORS['accent'])
+    ax2.set_title('GroupShuffleSplit: Sessions & Records',
                   fontsize=13, fontweight='bold')
 
     # Combined legend
@@ -749,7 +749,7 @@ def chart_session_split(report, output_dir):
     ax2.spines['top'].set_visible(False)
     ax2b.spines['top'].set_visible(False)
 
-    fig.suptitle('Разделение данных по сессиям (без утечки данных)',
+    fig.suptitle('Session-Based Data Split (no data leakage)',
                  fontsize=15, fontweight='bold', y=1.02)
     plt.tight_layout()
     path = output_dir / '11_session_split.png'
@@ -763,13 +763,13 @@ def chart_session_split(report, output_dir):
 # ═══════════════════════════════════════════════════════════════════
 def main():
     parser = argparse.ArgumentParser(
-        description='Генерация графиков для дипломной работы ErgoBoost')
+        description='Generate diploma charts for ErgoBoost')
     parser.add_argument('--report', type=str, default='ml/models/training_report.json',
-                        help='Путь к training_report.json')
+                        help='Path to training_report.json')
     parser.add_argument('--model', type=str, default='ml/models/posture_classifier.pkl',
-                        help='Путь к posture_classifier.pkl')
+                        help='Path to posture_classifier.pkl')
     parser.add_argument('--output', type=str, default='ml/diploma_charts',
-                        help='Папка для сохранения графиков')
+                        help='Output directory for charts')
     args = parser.parse_args()
 
     report_path = Path(args.report)
@@ -778,7 +778,7 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
 
     print('=' * 60)
-    print('  ErgoBoost — Генерация графиков для диплома')
+    print('  ErgoBoost — Diploma Chart Generation')
     print('=' * 60)
     print(f'  Report: {report_path}')
     print(f'  Model:  {model_path}')
@@ -787,7 +787,7 @@ def main():
 
     report, model_data = load_data(report_path, model_path)
 
-    print('Генерация графиков...\n')
+    print('Generating charts...\n')
 
     chart_model_comparison(report, output_dir)
     chart_confusion_matrices(report, output_dir)
@@ -803,9 +803,9 @@ def main():
 
     chart_count = len(list(output_dir.glob('*.png')))
     print(f'\n{"=" * 60}')
-    print(f'  Готово! {chart_count} графиков сохранены в: {output_dir}/')
+    print(f'  Done! {chart_count} charts saved to: {output_dir}/')
     print(f'{"=" * 60}')
-    print(f'\nСписок файлов:')
+    print(f'\nFile list:')
     for f in sorted(output_dir.glob('*.png')):
         size_kb = f.stat().st_size / 1024
         print(f'  📊 {f.name} ({size_kb:.0f} KB)')

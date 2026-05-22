@@ -232,3 +232,8 @@ class AuthWindow(QDialog):
 
     def get_db(self):
         return self.db
+
+    def reject(self):
+        if self.db:
+            self.db.close()
+        super().reject()

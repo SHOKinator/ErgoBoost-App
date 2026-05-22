@@ -17,28 +17,10 @@ import numpy as np
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-from matplotlib.backends.backend_agg import FigureCanvasAgg
 
 from data.sqlite_repo import SQLiteRepository
+from utils.chart_utils import fig_to_pixmap, style_axis, BG, CARD_BG, GRID, TEXT, BLUE, GREEN, RED, ORANGE
 
-BG = '#0f0f14'
-CARD_BG = '#16161e'
-GRID = '#1e1e2a'
-TEXT = '#8a8a9a'
-BLUE = '#6c8cff'
-GREEN = '#5a9a6a'
-RED = '#c04050'
-ORANGE = '#b08030'
-
-
-def _fig_to_pixmap(fig):
-    canvas = FigureCanvasAgg(fig)
-    canvas.draw()
-    buf = canvas.buffer_rgba()
-    arr = np.asarray(buf)
-    h, w, ch = arr.shape
-    qimg = QImage(arr.data, w, h, ch * w, QImage.Format_RGBA8888)
-    return QPixmap.fromImage(qimg)
 
 
 class StatsWorker(QThread):
@@ -96,7 +78,7 @@ class StatsWorker(QThread):
                 ax.set_ylim(0, 105)
                 plt.xticks(rotation=30, ha='right')
                 plt.tight_layout()
-                charts['score_trend'] = _fig_to_pixmap(fig)
+                charts['score_trend'] = fig_to_pixmap(fig)
                 plt.close(fig)
 
                 # Duration + Good posture bars
@@ -117,7 +99,7 @@ class StatsWorker(QThread):
                 ax1.set_xticklabels(date_labels, rotation=30, ha='right')
 
                 plt.tight_layout()
-                charts['duration'] = _fig_to_pixmap(fig)
+                charts['duration'] = fig_to_pixmap(fig)
                 plt.close(fig)
 
                 # Good posture % trend
@@ -138,7 +120,7 @@ class StatsWorker(QThread):
                 ax.set_ylim(0, 105)
 
                 plt.tight_layout()
-                charts['posture_pct'] = _fig_to_pixmap(fig)
+                charts['posture_pct'] = fig_to_pixmap(fig)
                 plt.close(fig)
 
             # Summary stats
@@ -188,6 +170,12 @@ class StatisticsTab(QWidget):
         refresh_btn.setMinimumSize(80, 34)
         refresh_btn.clicked.connect(self.refresh_statistics)
         header.addWidget(refresh_btn)
+
+        pdf_btn = QPushButton("Export PDF")
+        pdf_btn.setProperty("class", "primary")
+        pdf_btn.setMinimumSize(100, 34)
+        pdf_btn.clicked.connect(self._export_pdf)
+        header.addWidget(pdf_btn)
         layout.addLayout(header)
 
         scroll = QScrollArea()
@@ -288,3 +276,18 @@ class StatisticsTab(QWidget):
         err.setStyleSheet("color: #c04050; padding: 40px;")
         err.setWordWrap(True)
         self.content_layout.addWidget(err)
+
+    def _export_pdf(self):
+        from utils.pdf_report import generate_pdf_report
+        from pathlib import Path
+        try:
+            days = int(self.period_combo.currentText().split()[0])
+            db_path = self.settings.get('db_path', 'data/ergoboost.db')
+            db = SQLiteRepository(Path(db_path))
+            timestamp = __import__('datetime').datetime.now().strftime('%Y%m%d_%H%M%S')
+            output = Path(f"exports/report_{days}d_{timestamp}.pdf")
+            generate_pdf_report(db, self.user_id, days, output)
+            db.close()
+            QMessageBox.information(self, "PDF Exported", f"Report saved to:\n{output.resolve()}")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to export PDF:\n{e}")

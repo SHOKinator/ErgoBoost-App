@@ -17,7 +17,7 @@ from pathlib import Path
 from datetime import datetime
 
 from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, GroupKFold
 from sklearn.metrics import f1_score
 from sklearn.preprocessing import StandardScaler
 
@@ -128,13 +128,13 @@ class OnlineTrainer:
                 return
 
             # Engineer features
-            X, y, feature_names = self._engineer_features(df)
+            X, y, feature_names, groups = self._engineer_features(df)
 
             # Load current model metrics for comparison
             old_f1 = self._get_current_model_f1()
 
             # Train new model
-            new_model, new_scaler, new_f1 = self._train_model(X, y, feature_names)
+            new_model, new_scaler, new_f1 = self._train_model(X, y, feature_names, groups)
 
             if new_model is None:
                 logger.error("Training produced no model")
@@ -214,15 +214,32 @@ class OnlineTrainer:
 
         X = df[features].values
         y = df['label'].values
+        groups = df['session_id'].values
 
-        return X, y, features
+        return X, y, features, groups
 
-    def _train_model(self, X, y, feature_names):
-        """Train a GradientBoosting classifier and return (model, scaler, f1)."""
+    def _train_model(self, X, y, feature_names, groups=None):
+        """Train a GradientBoosting classifier with GroupKFold and return (model, scaler, f1)."""
         try:
-            X_train, X_test, y_train, y_test = train_test_split(
-                X, y, test_size=0.2, random_state=42, stratify=y
-            )
+            # Use GroupKFold by session_id to prevent data leakage
+            if groups is not None:
+                unique_groups = np.unique(groups)
+                if len(unique_groups) >= 5:
+                    gkf = GroupKFold(n_splits=5)
+                    # Use last fold as test set
+                    train_idx, test_idx = None, None
+                    for tr, te in gkf.split(X, y, groups):
+                        train_idx, test_idx = tr, te
+                    X_train, X_test = X[train_idx], X[test_idx]
+                    y_train, y_test = y[train_idx], y[test_idx]
+                else:
+                    X_train, X_test, y_train, y_test = train_test_split(
+                        X, y, test_size=0.2, random_state=42, stratify=y
+                    )
+            else:
+                X_train, X_test, y_train, y_test = train_test_split(
+                    X, y, test_size=0.2, random_state=42, stratify=y
+                )
 
             scaler = StandardScaler()
             X_train_scaled = scaler.fit_transform(X_train)

@@ -12,10 +12,29 @@ from utils.logger import setup_logger
 
 logger = setup_logger(__name__)
 
+PBKDF2_ITERATIONS = 600_000  # OWASP recommended
+
 
 def _hash_password(password: str, salt: str) -> str:
-    """Hash password with salt using SHA-256"""
+    """Hash password with PBKDF2-SHA256 (secure)."""
+    dk = hashlib.pbkdf2_hmac(
+        'sha256', password.encode('utf-8'),
+        salt.encode('utf-8'), PBKDF2_ITERATIONS
+    )
+    return f"pbkdf2${PBKDF2_ITERATIONS}${dk.hex()}"
+
+
+def _hash_password_legacy(password: str, salt: str) -> str:
+    """Legacy SHA-256 hash — for verifying old accounts only."""
     return hashlib.sha256((salt + password).encode('utf-8')).hexdigest()
+
+
+def _verify_password(password: str, salt: str, stored_hash: str) -> bool:
+    """Verify password against stored hash (supports both old and new format)."""
+    if stored_hash.startswith('pbkdf2$'):
+        return _hash_password(password, salt) == stored_hash
+    else:
+        return _hash_password_legacy(password, salt) == stored_hash
 
 
 class AuthService:
@@ -59,9 +78,18 @@ class AuthService:
         if not user:
             raise ValueError("Invalid username or password")
 
-        password_hash = _hash_password(password, user['salt'])
-        if password_hash != user['password_hash']:
+        if not _verify_password(password, user['salt'], user['password_hash']):
             raise ValueError("Invalid username or password")
+
+        # Auto-migrate legacy SHA-256 hash to PBKDF2
+        if not user['password_hash'].startswith('pbkdf2$'):
+            new_hash = _hash_password(password, user['salt'])
+            self.db.conn.execute(
+                "UPDATE users SET password_hash = ? WHERE id = ?",
+                (new_hash, user['id'])
+            )
+            self.db.conn.commit()
+            logger.info(f"Migrated password hash to PBKDF2 for user {username}")
 
         self.current_user = user
         logger.info(f"User signed in: {username}")

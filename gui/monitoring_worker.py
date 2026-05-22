@@ -48,6 +48,7 @@ class MonitoringWorker(QObject):
     error_occurred = Signal(str)
     finished = Signal()
     overlay_requested = Signal(bool, str)
+    overlay_countdown = Signal(int)  # seconds remaining before overlay
 
     def __init__(self, settings, user_id: int = 0):
         super().__init__()
@@ -80,6 +81,8 @@ class MonitoringWorker(QObject):
         self._calibration_just_finished = False
         self._is_overlay_active = False
         self._bad_state_start_time = None
+        self._dnd_active = False
+        self._last_countdown_value = -1
 
     def run(self):
         try:
@@ -94,6 +97,7 @@ class MonitoringWorker(QObject):
 
     def _initialize(self):
         logger.info("Initializing monitoring worker...")
+        self._camera_opened = False
 
         self.db = SQLiteRepository()
         self.session_manager = SessionManager(self.db)
@@ -102,6 +106,7 @@ class MonitoringWorker(QObject):
         self.camera = cv2.VideoCapture(camera_index)
         if not self.camera.isOpened():
             raise RuntimeError(f"Failed to open camera {camera_index}")
+        self._camera_opened = True
 
         self.camera.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
         self.camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
@@ -376,24 +381,46 @@ class MonitoringWorker(QObject):
 
         # OS Screen overlay logic
         reaction_mode = self.settings.get('reaction_mode', 'alert_only')
-        if reaction_mode == 'blur_os_screen' and not is_calibrating:
+        overlay_delay = self.settings.get('overlay_delay_seconds', 4)
+        if reaction_mode == 'blur_os_screen' and not is_calibrating and not self._dnd_active:
             is_bad_state = (metrics['posture_status'] == 'BAD' or 
                             metrics['distance_status'] not in ('OK', 'Unknown'))
             if is_bad_state:
                 if self._bad_state_start_time is None:
                     self._bad_state_start_time = time.time()
-                elif time.time() - self._bad_state_start_time >= 4.0:  # 4 seconds delay
+                elapsed = time.time() - self._bad_state_start_time
+                remaining = max(0, int(overlay_delay - elapsed + 0.5))
+                if elapsed >= overlay_delay:
+                    # Full overlay
                     if not self._is_overlay_active:
-                        msg = "Нарушение осанки!"
+                        msg = "Poor posture detected!"
                         if metrics.get('messages'):
                             msg = metrics['messages'][0]
                         self.overlay_requested.emit(True, msg)
                         self._is_overlay_active = True
+                    if self._last_countdown_value != 0:
+                        self.overlay_countdown.emit(0)
+                        self._last_countdown_value = 0
+                else:
+                    # Countdown phase
+                    if remaining != self._last_countdown_value:
+                        self.overlay_countdown.emit(remaining)
+                        self._last_countdown_value = remaining
             else:
                 self._bad_state_start_time = None
                 if self._is_overlay_active:
                     self.overlay_requested.emit(False, "")
                     self._is_overlay_active = False
+                if self._last_countdown_value != -1:
+                    self.overlay_countdown.emit(-1)  # -1 = hide countdown
+                    self._last_countdown_value = -1
+        elif self._is_overlay_active:
+            # Mode changed or DND activated — hide overlay
+            self.overlay_requested.emit(False, "")
+            self._is_overlay_active = False
+            self._bad_state_start_time = None
+            self.overlay_countdown.emit(-1)
+            self._last_countdown_value = -1
 
         return annotated, metrics
 
@@ -450,7 +477,7 @@ class MonitoringWorker(QObject):
             self._is_overlay_active = False
         if self.session_id:
             self.session_manager.end_session(self.session_id)
-        if self.camera:
+        if self.camera and self._camera_opened:
             self.camera.release()
         if self.db:
             self.db.close()
@@ -468,6 +495,13 @@ class MonitoringWorker(QObject):
 
     def set_paused(self, paused: bool):
         self.paused = paused
+
+    def set_dnd(self, active: bool):
+        """Set Do Not Disturb mode."""
+        self._dnd_active = active
+        if active and self._is_overlay_active:
+            self.overlay_requested.emit(False, "")
+            self._is_overlay_active = False
 
     def update_settings(self, settings):
         self.settings = settings

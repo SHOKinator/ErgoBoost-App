@@ -1,17 +1,18 @@
 # gui/main_window.py
 """
 ErgoBoost - Main GUI Application
-PySide6 Frontend with professional dark design
+PySide6 Frontend with professional dark design.
+Features: system tray, hotkeys, DND, auto-start, overlay countdown.
 """
 
 import sys
 from pathlib import Path
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QTabWidget, QLabel, QPushButton, QMessageBox
+    QTabWidget, QLabel, QPushButton, QMessageBox, QMenu, QSystemTrayIcon
 )
-from PySide6.QtCore import Qt, QThread
-from PySide6.QtGui import QIcon, QFont
+from PySide6.QtCore import Qt, QThread, QTimer
+from PySide6.QtGui import QIcon, QFont, QKeySequence, QShortcut, QAction
 
 from gui.dashboard_tab import DashboardTab
 from gui.sessions_tab import SessionsTab
@@ -302,6 +303,44 @@ QProgressBar::chunk {
     background-color: #4a6adf;
     border-radius: 2px;
 }
+
+QKeySequenceEdit {
+    background-color: #1a1a24;
+    border: 1px solid #2a2a3a;
+    border-radius: 4px;
+    padding: 4px 8px;
+    color: #c8c8d8;
+}
+
+QMenu {
+    background-color: #1a1a24;
+    border: 1px solid #2a2a3a;
+    color: #c8c8d8;
+    padding: 4px;
+}
+
+QMenu::item {
+    padding: 6px 24px;
+    border-radius: 3px;
+}
+
+QMenu::item:selected {
+    background-color: #4a6adf;
+}
+
+QMenu::separator {
+    height: 1px;
+    background: #2a2a3a;
+    margin: 4px 8px;
+}
+
+QSpinBox {
+    background-color: #1a1a24;
+    border: 1px solid #2a2a3a;
+    border-radius: 4px;
+    padding: 4px 8px;
+    color: #c8c8d8;
+}
 """
 
 
@@ -315,10 +354,22 @@ class ErgoBoostMainWindow(QMainWindow):
         self.user_id = user['id']
         self.auth_service = auth_service
         self.settings = Settings()
-        self._init_ui()
         self.monitoring_worker = None
         self.monitoring_thread = None
         self.screen_overlay = ScreenBlurOverlay()
+        self._dnd_active = False
+        self._dnd_timer = QTimer(self)
+        self._dnd_timer.setSingleShot(True)
+        self._dnd_timer.timeout.connect(self._end_dnd)
+        self._shortcuts = []
+        self._init_ui()
+        self._setup_tray()
+        self._setup_shortcuts()
+
+        # Auto-start monitoring if configured
+        if self.settings.get('auto_start_monitoring', False):
+            QTimer.singleShot(800, self._auto_start_monitoring)
+
         logger.info(f"ErgoBoost GUI initialized for user {user['username']}")
 
     def _init_ui(self):
@@ -343,6 +394,23 @@ class ErgoBoostMainWindow(QMainWindow):
         h_layout = QHBoxLayout(header)
         h_layout.setContentsMargins(16, 0, 16, 0)
         h_layout.setSpacing(8)
+
+        # DND button
+        self.dnd_btn = QPushButton("DND")
+        self.dnd_btn.setStyleSheet(
+            "QPushButton { background: transparent; color: #6a6a7a; border: none; "
+            "font-size: 11px; padding: 4px 8px; } "
+            "QPushButton:hover { color: #b08030; }"
+        )
+        self.dnd_btn.setToolTip("Do Not Disturb — pause all alerts")
+        self.dnd_btn.clicked.connect(self._toggle_dnd)
+        h_layout.addWidget(self.dnd_btn)
+
+        self.dnd_label = QLabel("")
+        self.dnd_label.setStyleSheet("color: #b08030; font-size: 11px; background: transparent; border: none;")
+        self.dnd_label.hide()
+        h_layout.addWidget(self.dnd_label)
+
         h_layout.addStretch()
 
         user_label = QLabel(f"{self.user.get('display_name', self.user['username'])}")
@@ -381,12 +449,164 @@ class ErgoBoostMainWindow(QMainWindow):
         self._connect_signals()
         self.statusBar().showMessage("Ready")
 
+    # ===== System Tray =====
+
+    def _setup_tray(self):
+        self.tray_icon = QSystemTrayIcon(self)
+        icon_path = Path("assets/icons/app_icon.png")
+        if icon_path.exists():
+            self.tray_icon.setIcon(QIcon(str(icon_path)))
+        else:
+            self.tray_icon.setIcon(self.style().standardIcon(
+                self.style().StandardPixmap.SP_ComputerIcon))
+
+        tray_menu = QMenu()
+
+        self.tray_show_action = tray_menu.addAction("Show Window")
+        self.tray_show_action.triggered.connect(self._show_from_tray)
+
+        tray_menu.addSeparator()
+
+        self.tray_monitor_action = tray_menu.addAction("Start Monitoring")
+        self.tray_monitor_action.triggered.connect(self._toggle_monitoring)
+
+        self.tray_pause_action = tray_menu.addAction("Pause")
+        self.tray_pause_action.triggered.connect(self._toggle_pause)
+        self.tray_pause_action.setEnabled(False)
+
+        tray_menu.addSeparator()
+
+        self.tray_dnd_action = tray_menu.addAction("Do Not Disturb")
+        self.tray_dnd_action.triggered.connect(self._toggle_dnd)
+
+        tray_menu.addSeparator()
+
+        quit_action = tray_menu.addAction("Quit")
+        quit_action.triggered.connect(self._quit_app)
+
+        self.tray_icon.setContextMenu(tray_menu)
+        self.tray_icon.activated.connect(self._on_tray_activated)
+        self.tray_icon.setToolTip("ErgoBoost — Posture Monitor")
+        self.tray_icon.show()
+
+    def _on_tray_activated(self, reason):
+        if reason == QSystemTrayIcon.DoubleClick:
+            self._show_from_tray()
+
+    def _show_from_tray(self):
+        self.showNormal()
+        self.activateWindow()
+        self.raise_()
+
+    def _update_tray_tooltip(self):
+        status = "monitoring" if self.monitoring_worker else "idle"
+        dnd = " [DND]" if self._dnd_active else ""
+        self.tray_icon.setToolTip(f"ErgoBoost — {status}{dnd}")
+
+    # ===== Hotkeys =====
+
+    def _setup_shortcuts(self):
+        # Clear old shortcuts
+        for sc in self._shortcuts:
+            sc.setEnabled(False)
+            sc.deleteLater()
+        self._shortcuts.clear()
+
+        hk_monitor = self.settings.get('hotkey_toggle_monitoring', 'Ctrl+M')
+        hk_pause = self.settings.get('hotkey_toggle_pause', 'Ctrl+P')
+        hk_dismiss = self.settings.get('hotkey_dismiss_overlay', 'Escape')
+
+        sc1 = QShortcut(QKeySequence(hk_monitor), self)
+        sc1.activated.connect(self._toggle_monitoring)
+        self._shortcuts.append(sc1)
+
+        sc2 = QShortcut(QKeySequence(hk_pause), self)
+        sc2.activated.connect(self._toggle_pause)
+        self._shortcuts.append(sc2)
+
+        sc3 = QShortcut(QKeySequence(hk_dismiss), self)
+        sc3.activated.connect(self._dismiss_overlay)
+        self._shortcuts.append(sc3)
+
+    # ===== DND Mode =====
+
+    def _toggle_dnd(self):
+        if self._dnd_active:
+            self._end_dnd()
+        else:
+            self._start_dnd()
+
+    def _start_dnd(self):
+        duration_min = self.settings.get('dnd_duration_minutes', 30)
+        self._dnd_active = True
+        self._dnd_timer.start(duration_min * 60 * 1000)
+
+        if self.monitoring_worker:
+            self.monitoring_worker.set_dnd(True)
+
+        self.dnd_btn.setStyleSheet(
+            "QPushButton { background: #3a2818; color: #e0a040; border: 1px solid #5a4020; "
+            "font-size: 11px; padding: 4px 8px; border-radius: 3px; } "
+            "QPushButton:hover { background: #4a3828; }"
+        )
+        self.dnd_btn.setText(f"DND ({duration_min}m)")
+        self.dnd_label.setText("Alerts paused")
+        self.dnd_label.show()
+        self.tray_dnd_action.setText(f"Stop DND ({duration_min}m remaining)")
+        self._update_tray_tooltip()
+        self.statusBar().showMessage(f"Do Not Disturb — {duration_min} minutes")
+        logger.info(f"DND enabled for {duration_min} minutes")
+
+    def _end_dnd(self):
+        self._dnd_active = False
+        self._dnd_timer.stop()
+
+        if self.monitoring_worker:
+            self.monitoring_worker.set_dnd(False)
+
+        self.dnd_btn.setStyleSheet(
+            "QPushButton { background: transparent; color: #6a6a7a; border: none; "
+            "font-size: 11px; padding: 4px 8px; } "
+            "QPushButton:hover { color: #b08030; }"
+        )
+        self.dnd_btn.setText("DND")
+        self.dnd_label.hide()
+        self.tray_dnd_action.setText("Do Not Disturb")
+        self._update_tray_tooltip()
+        self.statusBar().showMessage("Do Not Disturb ended")
+        logger.info("DND disabled")
+
+    # ===== Signals =====
+
     def _connect_signals(self):
         self.dashboard_tab.monitoring_started.connect(self.start_monitoring)
         self.dashboard_tab.monitoring_stopped.connect(self.stop_monitoring)
         self.dashboard_tab.monitoring_paused.connect(self.pause_monitoring)
         self.settings_tab.settings_changed.connect(self.on_settings_changed)
         self.tab_widget.currentChanged.connect(self.on_tab_changed)
+
+    # ===== Monitoring =====
+
+    def _auto_start_monitoring(self):
+        if self.monitoring_worker is None:
+            self.dashboard_tab._on_start_clicked()
+
+    def _toggle_monitoring(self):
+        if self.monitoring_worker is not None:
+            self.dashboard_tab._on_stop_clicked()
+        else:
+            self.dashboard_tab._on_start_clicked()
+
+    def _toggle_pause(self):
+        if self.monitoring_worker is not None:
+            self.dashboard_tab._on_pause_clicked()
+
+    def _dismiss_overlay(self):
+        """Emergency dismiss overlay."""
+        self.screen_overlay.hide_overlay()
+        if self.monitoring_worker and self.monitoring_worker._is_overlay_active:
+            self.monitoring_worker._is_overlay_active = False
+            self.monitoring_worker._bad_state_start_time = None
 
     def start_monitoring(self):
         if self.monitoring_worker is not None:
@@ -402,12 +622,20 @@ class ErgoBoostMainWindow(QMainWindow):
             self.monitoring_worker.calibration_progress.connect(self.dashboard_tab.update_calibration_progress)
             self.monitoring_worker.error_occurred.connect(self.on_monitoring_error)
             self.monitoring_worker.overlay_requested.connect(self._on_overlay_requested)
+            self.monitoring_worker.overlay_countdown.connect(self._on_overlay_countdown)
 
             self.monitoring_thread.started.connect(self.monitoring_worker.run)
             self.monitoring_worker.finished.connect(self.monitoring_thread.quit)
             self.monitoring_worker.finished.connect(self.on_monitoring_finished)
 
+            if self._dnd_active:
+                self.monitoring_worker.set_dnd(True)
+
             self.monitoring_thread.start()
+
+            self.tray_monitor_action.setText("Stop Monitoring")
+            self.tray_pause_action.setEnabled(True)
+            self._update_tray_tooltip()
             self.statusBar().showMessage("Monitoring active")
         except Exception as e:
             logger.error(f"Failed to start monitoring: {e}", exc_info=True)
@@ -423,6 +651,7 @@ class ErgoBoostMainWindow(QMainWindow):
         if self.monitoring_worker is None:
             return
         self.monitoring_worker.set_paused(paused)
+        self.tray_pause_action.setText("Resume" if paused else "Pause")
         self.statusBar().showMessage("Paused" if paused else "Monitoring active")
 
     def on_monitoring_finished(self):
@@ -432,6 +661,10 @@ class ErgoBoostMainWindow(QMainWindow):
         self.monitoring_worker = None
         self.monitoring_thread = None
         self.sessions_tab.refresh_sessions()
+        self.tray_monitor_action.setText("Start Monitoring")
+        self.tray_pause_action.setText("Pause")
+        self.tray_pause_action.setEnabled(False)
+        self._update_tray_tooltip()
         self.statusBar().showMessage("Stopped")
 
     def on_monitoring_error(self, error_msg):
@@ -443,9 +676,18 @@ class ErgoBoostMainWindow(QMainWindow):
         else:
             self.screen_overlay.hide_overlay()
 
+    def _on_overlay_countdown(self, seconds: int):
+        """Handle overlay countdown from worker."""
+        self.dashboard_tab.update_overlay_countdown(seconds)
+        if seconds > 0:
+            self.screen_overlay.show_countdown(seconds)
+        elif seconds < 0:
+            self.screen_overlay.hide_overlay()
+
     def on_settings_changed(self):
         if self.monitoring_worker:
             self.monitoring_worker.update_settings(self.settings)
+        self._setup_shortcuts()  # Rebuild hotkeys in case they changed
         self.statusBar().showMessage("Settings updated")
 
     def on_tab_changed(self, index):
@@ -464,27 +706,35 @@ class ErgoBoostMainWindow(QMainWindow):
         if self.auth_service:
             self.auth_service.sign_out()
         self.screen_overlay.hide_overlay()
+        self.tray_icon.hide()
         self.close()
         # Signal to app that we want to restart auth
         if self.sign_out_requested:
             self.sign_out_requested()
 
-    def closeEvent(self, event):
+    def _quit_app(self):
+        """Full quit from tray."""
         if self.monitoring_worker is not None:
-            reply = QMessageBox.question(
-                self, "Confirm Exit",
-                "Monitoring is active. Exit?",
-                QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+            self.monitoring_worker.stop()
+            if self.monitoring_thread:
+                self.monitoring_thread.quit()
+                self.monitoring_thread.wait(3000)
+        self.screen_overlay.hide_overlay()
+        self.tray_icon.hide()
+        QApplication.quit()
+
+    def closeEvent(self, event):
+        # Minimize to tray instead of quitting
+        if self.monitoring_worker is not None:
+            event.ignore()
+            self.hide()
+            self.tray_icon.showMessage(
+                "ErgoBoost",
+                "Monitoring continues in background. Right-click tray icon to quit.",
+                QSystemTrayIcon.MessageIcon.Information, 3000
             )
-            if reply == QMessageBox.Yes:
-                self.stop_monitoring()
-                if self.monitoring_thread:
-                    self.monitoring_thread.quit()
-                    self.monitoring_thread.wait(2000)
-                event.accept()
-            else:
-                event.ignore()
         else:
+            self.tray_icon.hide()
             event.accept()
 
 
@@ -494,6 +744,7 @@ def main():
     app.setApplicationName("ErgoBoost")
     app.setOrganizationName("ErgoBoost")
     app.setApplicationVersion("1.0.0")
+    app.setQuitOnLastWindowClosed(False)  # Keep running in tray
 
     from gui.auth_window import AuthWindow
 

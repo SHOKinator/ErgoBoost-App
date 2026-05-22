@@ -1,6 +1,6 @@
 # data/sqlite_repo.py
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Dict, List
 from utils.logger import setup_logger
@@ -17,6 +17,7 @@ class SQLiteRepository:
         self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
         self.conn.execute("PRAGMA foreign_keys = ON")
+        self.conn.execute("PRAGMA journal_mode = WAL")
         self._init_db()
 
     def _init_db(self):
@@ -109,7 +110,7 @@ class SQLiteRepository:
     # ===== USER MANAGEMENT =====
 
     def create_user(self, username, password_hash, salt, display_name="") -> int:
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S')
         with self.conn:
             cur = self.conn.execute(
                 "INSERT INTO users (username, password_hash, salt, display_name, created_at) VALUES (?, ?, ?, ?, ?)",
@@ -134,7 +135,7 @@ class SQLiteRepository:
     # ===== SESSION MANAGEMENT =====
 
     def start_session(self, user_id: int = 0) -> int:
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S')
         with self.conn:
             cur = self.conn.execute(
                 "INSERT INTO sessions (user_id, start_time) VALUES (?, ?)",
@@ -143,7 +144,7 @@ class SQLiteRepository:
         return cur.lastrowid
 
     def end_session(self, session_id: int):
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S')
         row = self.conn.execute(
             "SELECT start_time FROM sessions WHERE id = ?", (session_id,)
         ).fetchone()
@@ -194,7 +195,7 @@ class SQLiteRepository:
 
     def log_posture_event(self, session_id, forward_shift, lateral_tilt,
                           posture_status, severity):
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S')
         with self.conn:
             self.conn.execute(
                 """INSERT INTO posture_events
@@ -205,7 +206,7 @@ class SQLiteRepository:
 
     def log_eye_event(self, session_id, blink_count, ear,
                       blink_rate_per_min=0.0, fatigue_level='NORMAL'):
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S')
         with self.conn:
             self.conn.execute(
                 """INSERT INTO eye_events
@@ -215,7 +216,7 @@ class SQLiteRepository:
             )
 
     def log_distance_event(self, session_id, distance_ratio, distance_status):
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S')
         with self.conn:
             self.conn.execute(
                 """INSERT INTO distance_events (session_id, timestamp, distance_ratio, distance_status)
@@ -224,7 +225,7 @@ class SQLiteRepository:
             )
 
     def log_presence_event(self, session_id, is_present):
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S')
         with self.conn:
             self.conn.execute(
                 """INSERT INTO presence_events (session_id, timestamp, is_present)
@@ -352,7 +353,7 @@ class SQLiteRepository:
 
     def get_historical_data(self, days: int = 7, user_id: int = None) -> List[Dict]:
         from datetime import timedelta
-        cutoff = (datetime.utcnow() - timedelta(days=days)).isoformat()
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).strftime('%Y-%m-%dT%H:%M:%S')
         if user_id is not None:
             rows = self.conn.execute(
                 "SELECT * FROM sessions WHERE user_id = ? AND start_time >= ? ORDER BY start_time DESC",
@@ -377,7 +378,7 @@ class SQLiteRepository:
     # ===== SETTINGS (per-user) =====
 
     def save_setting(self, key: str, value: str, user_id: int = 0):
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S')
         with self.conn:
             self.conn.execute(
                 "INSERT OR REPLACE INTO user_settings (user_id, key, value, updated_at) VALUES (?, ?, ?, ?)",

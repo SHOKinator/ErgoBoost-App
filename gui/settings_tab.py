@@ -6,10 +6,10 @@ Settings tab - Application configuration
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QCheckBox,
     QComboBox, QFrame, QScrollArea, QSlider, QPushButton,
-    QMessageBox, QGroupBox, QSpinBox
+    QMessageBox, QGroupBox, QSpinBox, QKeySequenceEdit
 )
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QFont
+from PySide6.QtGui import QFont, QKeySequence
 
 
 class SettingsTab(QWidget):
@@ -39,11 +39,13 @@ class SettingsTab(QWidget):
         c_layout = QVBoxLayout(content)
         c_layout.setSpacing(12)
 
+        c_layout.addWidget(self._create_general_group())
         c_layout.addWidget(self._create_calibration_group())
         c_layout.addWidget(self._create_posture_group())
         c_layout.addWidget(self._create_alert_group())
         c_layout.addWidget(self._create_break_group())
         c_layout.addWidget(self._create_eye_group())
+        c_layout.addWidget(self._create_hotkeys_group())
         c_layout.addWidget(self._create_visual_group())
         c_layout.addStretch()
 
@@ -63,6 +65,29 @@ class SettingsTab(QWidget):
         save_btn.clicked.connect(self._save_settings)
         btn_row.addWidget(save_btn)
         layout.addLayout(btn_row)
+
+    def _create_general_group(self):
+        group = QGroupBox("General")
+        layout = QVBoxLayout(group)
+
+        self.auto_start_cb = QCheckBox("Auto-start monitoring on launch")
+        layout.addWidget(self.auto_start_cb)
+
+        row = QHBoxLayout()
+        row.addWidget(QLabel("Do Not Disturb duration:"))
+        self.dnd_duration_spin = QSpinBox()
+        self.dnd_duration_spin.setRange(5, 120)
+        self.dnd_duration_spin.setSuffix(" min")
+        self.dnd_duration_spin.setValue(30)
+        row.addWidget(self.dnd_duration_spin)
+        row.addStretch()
+        layout.addLayout(row)
+
+        info = QLabel("DND pauses all alerts and overlay for the set duration.")
+        info.setStyleSheet("color: #5a5a6a; font-size: 11px;")
+        info.setWordWrap(True)
+        layout.addWidget(info)
+        return group
 
     def _create_calibration_group(self):
         group = QGroupBox("Calibration")
@@ -128,6 +153,16 @@ class SettingsTab(QWidget):
         self.reaction_combo = QComboBox()
         self.reaction_combo.addItems(["Alert only", "Blur OS"])
         row.addWidget(self.reaction_combo)
+        row.addStretch()
+        layout.addLayout(row)
+
+        row = QHBoxLayout()
+        row.addWidget(QLabel("Overlay delay:"))
+        self.overlay_delay_spin = QSpinBox()
+        self.overlay_delay_spin.setRange(1, 15)
+        self.overlay_delay_spin.setSuffix(" sec")
+        self.overlay_delay_spin.setValue(4)
+        row.addWidget(self.overlay_delay_spin)
         row.addStretch()
         layout.addLayout(row)
 
@@ -200,6 +235,36 @@ class SettingsTab(QWidget):
         layout.addWidget(self.blink_cb)
         return group
 
+    def _create_hotkeys_group(self):
+        group = QGroupBox("Hotkeys")
+        layout = QVBoxLayout(group)
+
+        row = QHBoxLayout()
+        row.addWidget(QLabel("Toggle monitoring:"))
+        self.hk_monitoring = QKeySequenceEdit(QKeySequence("Ctrl+M"))
+        row.addWidget(self.hk_monitoring)
+        row.addStretch()
+        layout.addLayout(row)
+
+        row = QHBoxLayout()
+        row.addWidget(QLabel("Toggle pause:"))
+        self.hk_pause = QKeySequenceEdit(QKeySequence("Ctrl+P"))
+        row.addWidget(self.hk_pause)
+        row.addStretch()
+        layout.addLayout(row)
+
+        row = QHBoxLayout()
+        row.addWidget(QLabel("Dismiss overlay:"))
+        self.hk_dismiss = QKeySequenceEdit(QKeySequence("Escape"))
+        row.addWidget(self.hk_dismiss)
+        row.addStretch()
+        layout.addLayout(row)
+
+        info = QLabel("Click the field and press your desired key combination.")
+        info.setStyleSheet("color: #5a5a6a; font-size: 11px;")
+        layout.addWidget(info)
+        return group
+
     def _create_visual_group(self):
         group = QGroupBox("Visual")
         layout = QVBoxLayout(group)
@@ -211,6 +276,9 @@ class SettingsTab(QWidget):
 
     def _load_settings(self):
         s = self.settings
+
+        self.auto_start_cb.setChecked(s.get('auto_start_monitoring', False))
+        self.dnd_duration_spin.setValue(s.get('dnd_duration_minutes', 30))
 
         cal_mode = s.get('calibration_mode', 'always')
         self.cal_mode_combo.setCurrentText(
@@ -233,6 +301,7 @@ class SettingsTab(QWidget):
         else:
             self.reaction_combo.setCurrentText("Alert only")
 
+        self.overlay_delay_spin.setValue(s.get('overlay_delay_seconds', 4))
         self.sound_cb.setChecked(s.get('sound_alerts_enabled', False))
         self.cooldown_slider.setValue(int(s.get('alert_cooldown', 30)))
 
@@ -245,35 +314,35 @@ class SettingsTab(QWidget):
         self.face_lm_cb.setChecked(s.get('show_face_landmarks', False))
         self.pose_lm_cb.setChecked(s.get('show_pose_landmarks', True))
 
+        self.hk_monitoring.setKeySequence(QKeySequence(s.get('hotkey_toggle_monitoring', 'Ctrl+M')))
+        self.hk_pause.setKeySequence(QKeySequence(s.get('hotkey_toggle_pause', 'Ctrl+P')))
+        self.hk_dismiss.setKeySequence(QKeySequence(s.get('hotkey_dismiss_overlay', 'Escape')))
+
     def _save_settings(self):
-        s = self.settings
-
-        s.set('calibration_mode',
-              'always' if self.cal_mode_combo.currentText() == "Always calibrate" else 'once')
-        s.set('calibration_duration', float(self.cal_duration_combo.currentText().split()[0]))
-
-        s.set('posture_control_enabled', self.posture_enabled_cb.isChecked())
-        s.set('posture_sensitivity', self.sensitivity_combo.currentText().lower())
-        s.set('detection_mode',
-              'ml' if self.detection_combo.currentText() == "ML Model" else 'rule_based')
-
-        rm_text = self.reaction_combo.currentText()
-        if rm_text == "Blur OS":
-            s.set('reaction_mode', 'blur_os_screen')
-        else:
-            s.set('reaction_mode', 'alert_only')
-        s.set('sound_alerts_enabled', self.sound_cb.isChecked())
-        s.set('alert_cooldown', self.cooldown_slider.value())
-
-        s.set('break_reminder_enabled', self.break_enabled_cb.isChecked())
-        s.set('break_work_duration', self.soft_limit_spin.value() * 60)
-        s.set('break_max_work_duration', self.hard_limit_spin.value() * 60)
-        s.set('absence_threshold', self.absence_spin.value() * 60)
-
-        s.set('blink_tracking_enabled', self.blink_cb.isChecked())
-        s.set('show_face_landmarks', self.face_lm_cb.isChecked())
-        s.set('show_pose_landmarks', self.pose_lm_cb.isChecked())
-
+        updates = {
+            'auto_start_monitoring': self.auto_start_cb.isChecked(),
+            'dnd_duration_minutes': self.dnd_duration_spin.value(),
+            'calibration_mode': 'always' if self.cal_mode_combo.currentText() == "Always calibrate" else 'once',
+            'calibration_duration': float(self.cal_duration_combo.currentText().split()[0]),
+            'posture_control_enabled': self.posture_enabled_cb.isChecked(),
+            'posture_sensitivity': self.sensitivity_combo.currentText().lower(),
+            'detection_mode': 'ml' if self.detection_combo.currentText() == "ML Model" else 'rule_based',
+            'reaction_mode': 'blur_os_screen' if self.reaction_combo.currentText() == "Blur OS" else 'alert_only',
+            'overlay_delay_seconds': self.overlay_delay_spin.value(),
+            'sound_alerts_enabled': self.sound_cb.isChecked(),
+            'alert_cooldown': self.cooldown_slider.value(),
+            'break_reminder_enabled': self.break_enabled_cb.isChecked(),
+            'break_work_duration': self.soft_limit_spin.value() * 60,
+            'break_max_work_duration': self.hard_limit_spin.value() * 60,
+            'absence_threshold': self.absence_spin.value() * 60,
+            'blink_tracking_enabled': self.blink_cb.isChecked(),
+            'show_face_landmarks': self.face_lm_cb.isChecked(),
+            'show_pose_landmarks': self.pose_lm_cb.isChecked(),
+            'hotkey_toggle_monitoring': self.hk_monitoring.keySequence().toString(),
+            'hotkey_toggle_pause': self.hk_pause.keySequence().toString(),
+            'hotkey_dismiss_overlay': self.hk_dismiss.keySequence().toString(),
+        }
+        self.settings.batch_update(updates)
         self.settings_changed.emit()
         QMessageBox.information(self, "Saved", "Settings saved.")
 
