@@ -679,11 +679,14 @@ class ErgoBoostMainWindow(QMainWindow):
             self.screen_overlay.hide_overlay()
 
     def _on_overlay_countdown(self, seconds: int):
-        """Handle overlay countdown from worker."""
+        """Handle overlay countdown from worker.
+
+        The in-dashboard progress bar still ticks down, but the fullscreen
+        warning text is intentionally not shown during the wait — only the
+        full overlay (via _on_overlay_requested) appears once time is up.
+        """
         self.dashboard_tab.update_overlay_countdown(seconds)
-        if seconds > 0:
-            self.screen_overlay.show_countdown(seconds)
-        elif seconds < 0:
+        if seconds < 0:
             self.screen_overlay.hide_overlay()
 
     def on_settings_changed(self):
