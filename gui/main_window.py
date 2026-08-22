@@ -376,7 +376,8 @@ class ErgoBoostMainWindow(QMainWindow):
         self.setWindowTitle(f"ErgoBoost — {self.user.get('display_name', self.user['username'])}")
         self.setMinimumSize(1280, 800)
 
-        icon_path = Path("assets/icons/app_icon.png")
+        from utils.path_helper import get_resource_path
+        icon_path = get_resource_path("assets/icons/app_icon.png")
         if icon_path.exists():
             self.setWindowIcon(QIcon(str(icon_path)))
 
@@ -453,7 +454,8 @@ class ErgoBoostMainWindow(QMainWindow):
 
     def _setup_tray(self):
         self.tray_icon = QSystemTrayIcon(self)
-        icon_path = Path("assets/icons/app_icon.png")
+        from utils.path_helper import get_resource_path
+        icon_path = get_resource_path("assets/icons/app_icon.png")
         if icon_path.exists():
             self.tray_icon.setIcon(QIcon(str(icon_path)))
         else:

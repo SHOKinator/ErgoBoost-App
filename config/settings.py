@@ -83,8 +83,14 @@ class Settings:
         'analytics_export_interval': 86400,
     }
 
-    def __init__(self, config_file: Path = Path("config/settings.yaml")):
-        self.config_file = config_file
+    def __init__(self, config_file=None):
+        from utils.path_helper import get_writable_path
+        if config_file is None:
+            self.config_file = get_writable_path("config/settings.yaml")
+        elif isinstance(config_file, (str, Path)):
+            self.config_file = get_writable_path(config_file)
+        else:
+            self.config_file = config_file
         self.config = self._load_config()
 
     def _load_config(self) -> Dict:
@@ -108,7 +114,11 @@ class Settings:
             yaml.dump(config, f, default_flow_style=False, sort_keys=True)
 
     def get(self, key: str, default: Any = None) -> Any:
-        return self.config.get(key, default)
+        val = self.config.get(key, default)
+        if key == 'db_path' and val:
+            from utils.path_helper import get_writable_path
+            return str(get_writable_path(val))
+        return val
 
     def set(self, key: str, value: Any):
         self.config[key] = value

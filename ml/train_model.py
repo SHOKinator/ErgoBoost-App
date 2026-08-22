@@ -56,8 +56,11 @@ def load_data(db_path: str) -> pd.DataFrame:
     # Drop rows with missing posture values
     posture_df = posture_df.dropna(subset=['forward_shift', 'lateral_tilt'])
 
-    # Encode label
-    posture_df['label'] = (posture_df['posture_status'] == 'BAD').astype(int)
+    # Encode label (dynamically detect binary vs multiclass)
+    if posture_df['session_id'].isin([301, 302, 303, 304, 305, 306, 307, 999]).any():
+        posture_df['label'] = posture_df['severity'].astype(int)
+    else:
+        posture_df['label'] = (posture_df['posture_status'] == 'BAD').astype(int)
 
     print(f"\nDataset: {len(posture_df):,} samples")
     print(f"  OK: {(posture_df['label'] == 0).sum():,} ({(posture_df['label'] == 0).mean()*100:.1f}%)")
@@ -94,6 +97,11 @@ def train_and_evaluate(X, y, feature_names, groups, output_dir: Path):
     """Train models, evaluate with GroupKFold, save"""
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    # Dynamically select metrics parameters for binary vs multiclass
+    is_multiclass = len(np.unique(y)) > 2
+    avg_method = 'macro' if is_multiclass else 'binary'
+    scoring_method = 'f1_macro' if is_multiclass else 'f1'
+
     n_sessions = len(np.unique(groups))
     print(f"\nTotal sessions: {n_sessions}")
 
@@ -127,9 +135,9 @@ def train_and_evaluate(X, y, feature_names, groups, output_dir: Path):
     y_pred_rf = rf.predict(X_test)
 
     rf_acc = accuracy_score(y_test, y_pred_rf)
-    rf_prec = precision_score(y_test, y_pred_rf, zero_division=0)
-    rf_rec = recall_score(y_test, y_pred_rf, zero_division=0)
-    rf_f1 = f1_score(y_test, y_pred_rf, zero_division=0)
+    rf_prec = precision_score(y_test, y_pred_rf, average=avg_method, zero_division=0)
+    rf_rec = recall_score(y_test, y_pred_rf, average=avg_method, zero_division=0)
+    rf_f1 = f1_score(y_test, y_pred_rf, average=avg_method, zero_division=0)
 
     print(f"  Accuracy:  {rf_acc:.4f}")
     print(f"  Precision: {rf_prec:.4f}")
@@ -137,7 +145,7 @@ def train_and_evaluate(X, y, feature_names, groups, output_dir: Path):
     print(f"  F1 Score:  {rf_f1:.4f}")
 
     # Random 5-fold CV (baseline)
-    cv_scores = cross_val_score(rf, X_train, y_train, cv=5, scoring='f1')
+    cv_scores = cross_val_score(rf, X_train, y_train, cv=5, scoring=scoring_method)
     print(f"  Random CV F1:  {cv_scores.mean():.4f} (+/- {cv_scores.std():.4f})")
 
     # GroupKFold CV by session_id — proves generalization across sessions
@@ -145,7 +153,7 @@ def train_and_evaluate(X, y, feature_names, groups, output_dir: Path):
     if n_folds >= 2:
         gkf = GroupKFold(n_splits=n_folds)
         gkf_scores = cross_val_score(
-            rf, X_train, y_train, cv=gkf, groups=groups_train, scoring='f1'
+            rf, X_train, y_train, cv=gkf, groups=groups_train, scoring=scoring_method
         )
         print(f"  GroupKFold CV F1 ({n_folds}-fold by session): "
               f"{gkf_scores.mean():.4f} (+/- {gkf_scores.std():.4f})")
@@ -182,9 +190,9 @@ def train_and_evaluate(X, y, feature_names, groups, output_dir: Path):
     y_pred_gb = gb.predict(X_test)
 
     gb_acc = accuracy_score(y_test, y_pred_gb)
-    gb_prec = precision_score(y_test, y_pred_gb, zero_division=0)
-    gb_rec = recall_score(y_test, y_pred_gb, zero_division=0)
-    gb_f1 = f1_score(y_test, y_pred_gb, zero_division=0)
+    gb_prec = precision_score(y_test, y_pred_gb, average=avg_method, zero_division=0)
+    gb_rec = recall_score(y_test, y_pred_gb, average=avg_method, zero_division=0)
+    gb_f1 = f1_score(y_test, y_pred_gb, average=avg_method, zero_division=0)
 
     print(f"  Accuracy:  {gb_acc:.4f}")
     print(f"  Precision: {gb_prec:.4f}")
@@ -195,7 +203,7 @@ def train_and_evaluate(X, y, feature_names, groups, output_dir: Path):
     if n_folds >= 2:
         gkf_gb = GroupKFold(n_splits=n_folds)
         gkf_gb_scores = cross_val_score(
-            gb, X_train, y_train, cv=gkf_gb, groups=groups_train, scoring='f1'
+            gb, X_train, y_train, cv=gkf_gb, groups=groups_train, scoring=scoring_method
         )
         print(f"  GroupKFold CV F1 ({n_folds}-fold by session): "
               f"{gkf_gb_scores.mean():.4f} (+/- {gkf_gb_scores.std():.4f})")

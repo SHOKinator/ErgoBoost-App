@@ -11,21 +11,38 @@ from utils.logger import setup_logger
 
 logger = setup_logger(__name__)
 
-MODEL_PATH = Path("ml/models/posture_classifier.pkl")
+from utils.path_helper import get_resource_path, get_writable_path
+import shutil
+
+MODEL_PATH = get_writable_path("ml/models/posture_classifier.pkl")
 
 
 class PosturePredictor:
     """Loads trained ML model and predicts posture status in real-time"""
 
-    def __init__(self, model_path: Path = MODEL_PATH):
+    def __init__(self, model_path: Path = None):
         self.model = None
-        self.model_path = model_path
+        self.model_path = model_path if model_path is not None else MODEL_PATH
         self._load_model()
 
     def _load_model(self):
         if not self.model_path.exists():
+            bundled_path = get_resource_path("ml/models/posture_classifier.pkl")
+            if bundled_path.exists():
+                logger.info(f"Copying default ML model from bundle to {self.model_path}")
+                try:
+                    self.model_path.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(bundled_path, self.model_path)
+                except Exception as e:
+                    logger.error(f"Failed to copy default model: {e}")
+            else:
+                logger.warning(f"ML model not found at {self.model_path} and no bundled fallback exists")
+                return
+
+        if not self.model_path.exists():
             logger.warning(f"ML model not found at {self.model_path}")
             return
+
         try:
             with open(self.model_path, 'rb') as f:
                 data = pickle.load(f)

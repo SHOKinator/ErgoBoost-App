@@ -25,8 +25,10 @@ from utils.logger import setup_logger
 
 logger = setup_logger(__name__)
 
-MODEL_PATH = Path("ml/models/posture_classifier.pkl")
-DB_PATH = Path("data/ergoboost.db")
+from utils.path_helper import get_writable_path
+
+MODEL_PATH = get_writable_path("ml/models/posture_classifier.pkl")
+DB_PATH = get_writable_path("data/ergoboost.db")
 
 # Minimum new samples since last training to trigger retraining
 MIN_NEW_SAMPLES = 300

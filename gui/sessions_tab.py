@@ -62,11 +62,12 @@ class SessionsTab(QWidget):
         hdr.setSectionResizeMode(5, QHeaderView.Fixed)
 
         self.sessions_table.setColumnWidth(0, 50)
-        self.sessions_table.setColumnWidth(5, 80)
+        self.sessions_table.setColumnWidth(5, 95)
         self.sessions_table.setAlternatingRowColors(True)
         self.sessions_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.sessions_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.sessions_table.verticalHeader().setVisible(False)
+        self.sessions_table.verticalHeader().setDefaultSectionSize(38)
 
         layout.addWidget(self.sessions_table)
 

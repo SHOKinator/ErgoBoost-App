@@ -9,9 +9,16 @@ Usage:
     python -m ml.generate_diploma_charts --output diploma_charts
 """
 
+import sys
 import json
 import pickle
 import argparse
+
+# Reconfigure stdout/stderr to use UTF-8
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
+if hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(encoding='utf-8')
 import numpy as np
 import matplotlib
 matplotlib.use('Agg')  # headless rendering
@@ -221,8 +228,12 @@ def chart_feature_importance(report, output_dir):
     plt.tight_layout()
     path = output_dir / '03_feature_importance.png'
     plt.savefig(path)
+    # Save a separate RF-specific named version
+    rf_path = output_dir / 'rf_feature_importance.png'
+    plt.savefig(rf_path)
     plt.close()
-    print(f'  ✓ {path.name}')
+    print(f'  [OK] {path.name}')
+    print(f'  [OK] {rf_path.name}')
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -461,10 +472,10 @@ def chart_cross_validation(report, output_dir):
     # Add annotation about generalization
     delta = abs(rf.get('cv_f1_mean', 0) - rf.get('group_cv_f1_mean', 0))
     if delta < 0.02:
-        msg = f'\u0394 = {delta:.4f} — model generalizes (no session memorization) \u2713'
+        msg = f"Delta = {delta:.4f} - model generalizes (no session memorization) [OK]"
         color = COLORS['ok']
     else:
-        msg = f'\u0394 = {delta:.4f} — possible overfitting on sessions \u26a0'
+        msg = f"Delta = {delta:.4f} - possible overfitting on sessions [WARNING]"
         color = COLORS['bad']
     ax.text(0.5, 0.02, msg, transform=ax.transAxes, ha='center',
             fontsize=12, fontweight='bold', color=color,
@@ -475,7 +486,7 @@ def chart_cross_validation(report, output_dir):
     path = output_dir / '07_cross_validation_groupkfold.png'
     plt.savefig(path)
     plt.close()
-    print(f'  \u2713 {path.name}')
+    print(f'  [OK] {path.name}')
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -789,6 +800,7 @@ def main():
 
     print('Generating charts...\n')
 
+    # Existing combined charts
     chart_model_comparison(report, output_dir)
     chart_confusion_matrices(report, output_dir)
     chart_feature_importance(report, output_dir)
@@ -801,6 +813,24 @@ def main():
     chart_error_analysis(report, output_dir)
     chart_session_split(report, output_dir)
 
+    print('\nGenerating separate charts for Random Forest and Gradient Boosting...\n')
+
+    # New separate charts for Random Forest
+    rf_data = report['results']['random_forest']
+    rf_cr = report['classification_report_rf']
+    chart_confusion_matrix_single('Random Forest', rf_data, 'Blues', output_dir / 'rf_confusion_matrix.png', normalized=False)
+    chart_confusion_matrix_single('Random Forest', rf_data, 'Blues', output_dir / 'rf_confusion_matrix_normalized.png', normalized=True)
+    chart_per_class_metrics_single('Random Forest', rf_cr, output_dir / 'rf_per_class_metrics.png')
+    chart_error_analysis_single('Random Forest', rf_data, output_dir / 'rf_error_analysis.png')
+
+    # New separate charts for Gradient Boosting
+    gb_data = report['results']['gradient_boosting']
+    gb_cr = report['classification_report_gb']
+    chart_confusion_matrix_single('Gradient Boosting', gb_data, 'Purples', output_dir / 'gb_confusion_matrix.png', normalized=False)
+    chart_confusion_matrix_single('Gradient Boosting', gb_data, 'Purples', output_dir / 'gb_confusion_matrix_normalized.png', normalized=True)
+    chart_per_class_metrics_single('Gradient Boosting', gb_cr, output_dir / 'gb_per_class_metrics.png')
+    chart_error_analysis_single('Gradient Boosting', gb_data, output_dir / 'gb_error_analysis.png')
+
     chart_count = len(list(output_dir.glob('*.png')))
     print(f'\n{"=" * 60}')
     print(f'  Done! {chart_count} charts saved to: {output_dir}/')
@@ -809,6 +839,153 @@ def main():
     for f in sorted(output_dir.glob('*.png')):
         size_kb = f.stat().st_size / 1024
         print(f'  📊 {f.name} ({size_kb:.0f} KB)')
+
+
+# ═══════════════════════════════════════════════════════════════════
+#  New: Separate Charts for Random Forest and Gradient Boosting
+# ═══════════════════════════════════════════════════════════════════
+
+def chart_confusion_matrix_single(name, data, cmap, output_path, normalized=False):
+    """Draw a single, beautiful confusion matrix."""
+    fig, ax = plt.subplots(figsize=(6.5, 5.5))
+    fig.patch.set_facecolor('white')
+    ax.set_facecolor('white')
+
+    cm = np.array(data['confusion_matrix'])
+    class_labels = ['OK (normal)', 'BAD (violation)']
+
+    if normalized:
+        cm_norm = cm.astype(float) / cm.sum(axis=1, keepdims=True) * 100
+        im = ax.imshow(cm_norm, interpolation='nearest', cmap=cmap, aspect='auto',
+                       vmin=0, vmax=100)
+        
+        # Annotate
+        for i in range(2):
+            for j in range(2):
+                val = cm_norm[i][j]
+                text_color = 'white' if val > 50 else COLORS['text']
+                ax.text(j, i, f'{val:.2f}%',
+                        ha='center', va='center', fontsize=14,
+                        fontweight='bold', color=text_color)
+        plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04, format='%.0f%%')
+        ax.set_title(f'{name}\nNormalized Confusion Matrix', fontsize=14, fontweight='bold', pad=15)
+    else:
+        total = cm.sum()
+        cm_pct = cm / total * 100
+        im = ax.imshow(cm_pct, interpolation='nearest', cmap=cmap, aspect='auto',
+                       vmin=0, vmax=70)
+        
+        # Annotate
+        for i in range(2):
+            for j in range(2):
+                count = cm[i][j]
+                pct = cm_pct[i][j]
+                text_color = 'white' if pct > 35 else COLORS['text']
+                ax.text(j, i, f'{count:,}\n({pct:.1f}%)',
+                        ha='center', va='center', fontsize=12,
+                        fontweight='bold', color=text_color)
+        plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+        ax.set_title(f'{name}\nConfusion Matrix', fontsize=14, fontweight='bold', pad=15)
+
+    ax.set_xticks([0, 1])
+    ax.set_yticks([0, 1])
+    ax.set_xticklabels(class_labels, fontsize=10)
+    ax.set_yticklabels(class_labels, fontsize=10)
+    ax.set_xlabel('Predicted Class', fontsize=11)
+    ax.set_ylabel('True Class', fontsize=11)
+
+    plt.tight_layout()
+    plt.savefig(output_path)
+    plt.close()
+    print(f'  [OK] {output_path.name}')
+
+
+def chart_per_class_metrics_single(model_name, cr, output_path):
+    """Draw per-class metrics (Precision, Recall, F1) for a single model."""
+    metrics = ['precision', 'recall', 'f1-score']
+    labels = ['Precision', 'Recall', 'F1-Score']
+
+    fig, ax = plt.subplots(figsize=(7, 5))
+    fig.patch.set_facecolor('white')
+    ax.set_facecolor('white')
+
+    ok_vals = [cr['0'][m] for m in metrics]
+    bad_vals = [cr['1'][m] for m in metrics]
+
+    x = np.arange(len(labels))
+    width = 0.3
+
+    bars_ok = ax.bar(x - width/2, ok_vals, width, label='OK (normal)',
+                     color=COLORS['ok'], edgecolor='white', linewidth=1.5,
+                     zorder=3, alpha=0.85)
+    bars_bad = ax.bar(x + width/2, bad_vals, width, label='BAD (violation)',
+                      color=COLORS['bad'], edgecolor='white', linewidth=1.5,
+                      zorder=3, alpha=0.85)
+
+    for bars in [bars_ok, bars_bad]:
+        for bar in bars:
+            h = bar.get_height()
+            ax.annotate(f'{h:.4f}',
+                        xy=(bar.get_x() + bar.get_width()/2, h),
+                        xytext=(0, 4), textcoords='offset points',
+                        ha='center', va='bottom', fontsize=10, fontweight='bold')
+
+    ax.set_title(f'{model_name} — Per-Class Metrics', fontsize=13, fontweight='bold', pad=15)
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels)
+    ax.set_ylim(0.93, 1.005)
+    ax.legend(loc='lower right', fontsize=10, framealpha=0.9)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+
+    plt.tight_layout()
+    plt.savefig(output_path)
+    plt.close()
+    print(f'  [OK] {output_path.name}')
+
+
+def chart_error_analysis_single(model_name, data, output_path):
+    """Draw detailed prediction breakdown (TP, TN, FP, FN) as a donut chart."""
+    cm = data['confusion_matrix']
+    tn, fp = cm[0]
+    fn, tp = cm[1]
+    total = tp + tn + fp + fn
+
+    fig, ax = plt.subplots(figsize=(6.5, 5.5))
+    fig.patch.set_facecolor('white')
+
+    # Categories
+    sizes = [tn, tp, fp, fn]
+    labels = [
+        f'True Negative (OK)\n{tn:,} ({tn/total*100:.1f}%)',
+        f'True Positive (BAD)\n{tp:,} ({tp/total*100:.1f}%)',
+        f'False Positive (OK->BAD)\n{fp:,} ({fp/total*100:.1f}%)',
+        f'False Negative (BAD->OK)\n{fn:,} ({fn/total*100:.1f}%)'
+    ]
+    colors = [COLORS['ok'], '#059669', COLORS['accent'], COLORS['bad']]
+    
+    # Donut chart
+    wedges, texts = ax.pie(
+        sizes, labels=labels, colors=colors,
+        startangle=90, textprops={'fontsize': 10, 'fontweight': 'bold'},
+        wedgeprops={'edgecolor': 'white', 'linewidth': 2, 'width': 0.4}
+    )
+    
+    errors = fp + fn
+    error_pct = errors / total * 100
+    
+    # Center text
+    ax.text(0, 0, f'Errors:\n{errors:,}\n({error_pct:.2f}%)',
+            ha='center', va='center', fontsize=12, fontweight='bold',
+            color=COLORS['bad'])
+
+    ax.set_title(f'{model_name}\nPrediction Breakdown & Error Analysis',
+                 fontsize=14, fontweight='bold', pad=15)
+    
+    plt.tight_layout()
+    plt.savefig(output_path)
+    plt.close()
+    print(f'  [OK] {output_path.name}')
 
 
 if __name__ == '__main__':

@@ -14,9 +14,12 @@ import numpy as np
 
 class ModelLoader:
     def __init__(self):
+        from utils.path_helper import get_resource_path
+
         # Face Landmarker (Tasks API)
+        face_model_path = str(get_resource_path("models/face_landmarker.task"))
         base_options = python.BaseOptions(
-            model_asset_path="models/face_landmarker.task"
+            model_asset_path=face_model_path
         )
         face_options = vision.FaceLandmarkerOptions(
             base_options=base_options,
@@ -27,8 +30,9 @@ class ModelLoader:
         self.face_mesh = vision.FaceLandmarker.create_from_options(face_options)
 
         # Pose Landmarker (Tasks API)
+        pose_model_path = str(get_resource_path("models/pose_landmarker_lite.task"))
         base_options = python.BaseOptions(
-            model_asset_path="models/pose_landmarker_lite.task"
+            model_asset_path=pose_model_path
         )
         pose_options = vision.PoseLandmarkerOptions(
             base_options=base_options,

@@ -7,14 +7,22 @@ from utils.logger import setup_logger
 
 logger = setup_logger(__name__)
 
-DB_PATH = Path("data/ergoboost.db")
+from utils.path_helper import get_writable_path
+
+DB_PATH = get_writable_path("data/ergoboost.db")
 
 
 class SQLiteRepository:
-    def __init__(self, db_path: Path = DB_PATH):
-        self.db_path = db_path
+    def __init__(self, db_path=None):
+        if db_path is None:
+            self.db_path = DB_PATH
+        elif isinstance(db_path, (str, Path)):
+            self.db_path = get_writable_path(db_path)
+        else:
+            self.db_path = db_path
+
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
+        self.conn = sqlite3.connect(str(self.db_path), check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
         self.conn.execute("PRAGMA foreign_keys = ON")
         self.conn.execute("PRAGMA journal_mode = WAL")

@@ -28,9 +28,12 @@ def setup_logger(name: str, log_file: Path = None) -> logging.Logger:
     logger.addHandler(console_handler)
 
     if log_file is None:
-        log_dir = Path("logs")
-        log_dir.mkdir(exist_ok=True)
+        from utils.path_helper import get_writable_path
+        log_dir = get_writable_path("logs")
         log_file = log_dir / f"ergoboost_{datetime.now().strftime('%Y%m%d')}.log"
+
+    # Make sure directory containing the log file exists
+    Path(log_file).parent.mkdir(parents=True, exist_ok=True)
 
     file_handler = logging.FileHandler(log_file)
     file_handler.setLevel(logging.DEBUG)
