@@ -11,6 +11,8 @@
 [![PySpark](https://img.shields.io/badge/Big%20Data-PySpark-E25A1C?logo=apachespark&logoColor=white)](https://spark.apache.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
+**[🇬🇧 English](README.md) | [🇷🇺 Читать на русском](README.ru.md)**
+
 ![ErgoBoost catching a slouch and warning the user](docs/screenshots/shift.gif)
 
 </div>
